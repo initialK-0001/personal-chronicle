@@ -6,13 +6,18 @@ root=Path(__file__).resolve().parents[1];out=root/'xserver/ui';out.mkdir(exist_o
 for name in ['style.css','timeline.js','index.html','public.js','admin.html','admin.js']:
  s=(root/'dist'/name).read_text()
  if name.endswith('.js'):s=s.replace("import {samples} from './samples.js';","const samples=[];")
- if name=='public.js':s=s.replace("const postURL=p=>basePage+'?post='+encodeURIComponent(p.id);","const postURL=p=>p.url||basePage+'?post='+encodeURIComponent(p.id);")
+ if name=='public.js':
+  s="import {mountComments} from '/comments.js';\n"+s
+  s=s.replace("document.title=p?","if(p)mountComments(articlePage,p.id);\n document.title=p?")
+  s=s.replace("const postURL=p=>basePage+'?post='+encodeURIComponent(p.id);","const postURL=p=>p.url||basePage+'?post='+encodeURIComponent(p.id);")
+ if name=='timeline.js':s=s.replace('<time>${date}</time>', '<time>${date}</time>${!admin?`<a href="${esc(url)}#comments">コメント</a>`:String()}')
  if name=='admin.html':
-  s=s.replace('<a href="report.html">設計資料</a>','<button id="logoutButton">ログアウト</button>')
+  s=s.replace('<a href="report.html">設計資料</a>','<a href="/admin/comments">コメント</a><button id="logoutButton">ログアウト</button>')
   s=re.sub(r'<section id="commentManagement".*?</section>','',s)
   s=s.replace('<a href="report.html">調査と設計</a><a href="source.zip" download>ソースを保存</a>','')
   s=s.replace('<script type="module" src="comments-admin.js"></script>','').replace('image/webp,image/gif','image/webp')
   s=re.sub(r'<div class="adposition">.*?</div>','',s)
+ if name=='style.css':s+='\n.comments{margin-top:40px}.comments label,.comment label{display:block;margin:12px 0}.comments input,.comments textarea,.comment textarea{display:block;width:100%;box-sizing:border-box}.comment{border-top:1px solid #ddd;padding:20px 0}.comment p{white-space:pre-wrap;overflow-wrap:anywhere}.comment button{margin:8px}\n'
  if name=='style.css':s+='\n.legacy-article{max-width:900px;margin:32px auto;padding:0 20px}.legacy-article img{max-width:100%;height:auto}.legacy-article pre{overflow:auto}.legacy-article table{max-width:100%;display:block;overflow:auto}.login{max-width:420px;margin:60px auto;padding:20px}.login label,.login input{display:block;width:100%;margin:12px 0}\n'
  if name=='admin.js':
   s="let csrf='';const session=await fetch('/api/session').then(r=>r.json());if(!session.authenticated)location.href='/login';csrf=session.csrf;\n"+s

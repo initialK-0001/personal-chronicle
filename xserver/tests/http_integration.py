@@ -73,6 +73,29 @@ with tempfile.TemporaryDirectory() as tmp:
   assert '投稿' in a.open(origin+'/admin').read().decode()
   assert anon.open(origin+'/admin').geturl()==origin+'/login'
   assert 'noindex' in anon.open(origin+'/login').read().decode()
+  # Comments use the same anonymous CSRF protection and never expose pending text.
+  status,created,_=call(a,'/api/admin/posts',doc,token);commentpost=str(created['post']['id'])
+  assert call(a,'/api/admin/posts/'+commentpost,{'action':'release','revision':1},token)[0]==200
+  ct=call(anon,'/api/session')[1]['csrf']
+  submitted={'post':commentpost,'body':'未承認の匿名コメント','status':'approved','id':999}
+  assert call(anon,'/api/public/comments',submitted)[0]==403
+  assert call(anon,'/api/public/comments',submitted,ct,{'Origin':'https://wrong.invalid'})[0]==403
+  assert call(anon,'/api/public/comments',submitted,ct)[0]==202
+  assert call(anon,'/api/public/comments?post='+commentpost)[1]['comments']==[]
+  assert call(anon,'/api/admin/comments')[0]==401
+  pending=call(a,'/api/admin/comments')[1]['comments'][0];cid=str(pending['id'])
+  assert pending['name']=='' and cid!='999'
+  assert call(a,'/api/admin/comments/'+cid,{'revision':1,'action':'reply','reply':'先に返信'},token)[0]==409
+  assert call(a,'/api/admin/comments/'+cid,{'revision':1,'action':'approve'},token)[0]==200
+  assert call(anon,'/api/public/comments?post='+commentpost)[1]['comments'][0]['body']==submitted['body']
+  assert call(a,'/api/admin/comments/'+cid,{'revision':2,'action':'reply','reply':'返信'},token)[0]==200
+  assert call(anon,'/api/public/comments?post='+commentpost)[1]['comments'][0]['reply']=='返信'
+  assert call(a,'/api/admin/comments/'+cid,{'revision':3,'action':'delete'},token)[0]==200
+  assert call(anon,'/api/public/comments?post='+commentpost)[1]['comments']==[]
+  for _ in range(4):assert call(anon,'/api/public/comments',submitted,ct)[0]==202
+  assert call(anon,'/api/public/comments',submitted,ct)[0]==429
+  assert a.open(origin+'/admin/comments').status==200
+  assert anon.open(origin+'/admin/comments').geturl()==origin+'/login'
   assert call(a,'/api/logout',{},token)[0]==200
   assert call(a,f'/api/admin/posts/{id}')[0]==401
   t=call(anon,'/api/session')[1]['csrf']

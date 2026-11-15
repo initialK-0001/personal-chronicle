@@ -50,6 +50,6 @@ final class Legacy {
     }
     public function page(array $r):string{
         $e=fn($v)=>htmlspecialchars($v??'',ENT_QUOTES,'UTF-8');
-        return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'.$e($r['title']).' | Brand-new TOKYO</title><link rel="stylesheet" href="/style.css"></head><body><div class="masthead"><header><a class="brand" href="/">Brand-new TOKYO</a></header></div><main class="legacy-article"><h1>'.$e($r['title']).'</h1><time>'.$e(substr($r['published_at']??'',0,10)).'</time><div class="rendered">'.$this->html($r['original_html']).'</div><a href="/">一覧へ戻る</a></main></body></html>';
+        return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'.$e($r['title']).' | Brand-new TOKYO</title><link rel="stylesheet" href="/style.css"></head><body><div class="masthead"><header><a class="brand" href="/">Brand-new TOKYO</a></header></div><main class="legacy-article"><h1>'.$e($r['title']).'</h1><time>'.$e(substr($r['published_at']??'',0,10)).'</time><div class="rendered">'.$this->html($r['original_html']).'</div><div data-comment-post="legacy-'.(int)$r['legacy_id'].'"></div><a href="/">一覧へ戻る</a></main><script type="module" src="/comments.js"></script></body></html>';
     }
 }

@@ -1,3 +1,4 @@
+import {mountComments} from '/comments.js';
 const samples=[];
 import {timelineHTML,collectionEligible} from './timeline.js';
 'use strict';
@@ -33,6 +34,7 @@ function renderPage(){
  if(collection){articlePage.innerHTML='<a href="'+basePage+'">一覧へ戻る</a><h1>作品集</h1><div class="collectionlinks">'+[...new Set(allPosts().filter(collectionEligible).flatMap(p=>p.tags))].map(t=>`<a href="${basePage}?works=1&theme=${encodeURIComponent(t)}">${esc(t)}</a>`).join('')+'</div>';return;}
  const p=allPosts().find(p=>p.id===postId);
  articlePage.innerHTML=`<a href="${basePage}">一覧へ戻る</a>`+(p?renderContent(p):`<h1>${loadError?'投稿を読み込めません 再読み込みしてください':loading?'読み込み中':'投稿が見つかりません'}</h1>`)+'';
+ if(p)mountComments(articlePage,p.id);
  document.title=p?(p.title||'投稿')+' | Brand-new TOKYO':'投稿が見つかりません | Brand-new TOKYO';
  
 }

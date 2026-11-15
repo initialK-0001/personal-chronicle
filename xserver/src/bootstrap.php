@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/Store.php';
 require_once __DIR__.'/Auth.php';
+require_once __DIR__.'/Comments.php';
 require_once __DIR__.'/Media.php';
 require_once __DIR__.'/Legacy.php';
 function chronicle_boot():array {
