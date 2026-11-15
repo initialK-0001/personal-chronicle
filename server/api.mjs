@@ -1,3 +1,4 @@
+import {adminStatus} from './access.mjs';
 // Private prototype storage. Host authentication must strip client-supplied identity headers.
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 const fail=(message,status=400)=>{throw Object.assign(new Error(message),{status});};
@@ -16,7 +17,7 @@ async function limited(request,max){if(Number(request.headers.get('Content-Lengt
 const hash=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
 export async function api(request,env){try{
  const url=new URL(request.url),path=url.pathname,user=request.headers.get('oai-authenticated-user-id');
- if(!user)return json({error:'ログインしてください'},401);
+ const access=adminStatus(request,env);if(access!==200)return json({error:access===401?'ログインしてください':access===503?'管理者設定を確認してください':'管理者のみ利用できます'},access);
  if(!env.BUCKET)return json({error:'保存先に接続できません'},503);
  const prefix='users/'+await hash(new TextEncoder().encode(user))+'/';
  if(!['GET','HEAD'].includes(request.method)&& (request.headers.get('Origin')!==url.origin||request.headers.get('X-Chronicle-Request')!=='1'))return json({error:'この画面から操作してください'},403);
