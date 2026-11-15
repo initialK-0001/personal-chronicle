@@ -1,3 +1,4 @@
+import {samples} from './samples.js';
 import {timelineHTML,collectionEligible} from './timeline.js';
 'use strict';
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
@@ -10,7 +11,7 @@ let state={draft:null,posts:[]},etag=null,ready=false,conflict=false,saveTimer,e
 const message=t=>{$('#toast').textContent=t;$('#toast').hidden=false;clearTimeout(message.timer);message.timer=setTimeout(()=>$('#toast').hidden=true,5000);};
 const prose=p=>p.blocks.filter(b=>b.type==='paragraph'||b.type==='quote').map(b=>b.text).join('\n');
 const dateLabel=p=>p.date?esc(new Date(p.date).toLocaleDateString('ja-JP',{timeZone:'Asia/Tokyo'})):'';
-const allPosts=()=>state.posts;
+const allPosts=()=>[...state.posts,...samples.filter(p=>!state.posts.some(saved=>saved.id===p.id))];
 async function requestAPI(path,options={}){const r=await fetch(path,{...options,cache:'no-store',headers:{'X-Chronicle-Request':'1',...(options.headers||{})}});let data;try{data=await r.json();}catch{throw Error('サーバーに接続できません');}if(!r.ok){if(r.status===409)conflict=true;throw Error(data.error||'保存できません');}return data;}
 function persist(action='draft',post=editing,postId){
  clearTimeout(saveTimer);if(!ready||conflict)return Promise.reject(Error(conflict?'別の端末で変更されています 入力を書き出してから読み直してください':'保存先に接続できません'));
@@ -28,7 +29,7 @@ $('#feed').innerHTML=posts.map(p=>timelineHTML(p,postURL(p),true)).join('');
  renderPage();
 const themes=['すべて',...new Set(allPosts().flatMap(p=>p.tags))];$('#themes').innerHTML=themes.map(t=>`<button data-tag="${esc(t)}" class="${(t==='すべて'&&!tag)||tag===t?'active':''}">${esc(t)}</button>`).join('');$$('#themes button').forEach(b=>b.onclick=()=>{tag=b.dataset.tag==='すべて'?'':b.dataset.tag;if(location.search){location.href=basePage+'?theme='+encodeURIComponent(tag);return;}render();});}
 function clearFilters(){if(location.search){location.href=basePage;return;}search='';tag='';view='all';$('#search').value='';$$('[data-view]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.view==='all')));render();}
-function renderContent(p){return `<div class="rendered"><div class="hint">${dateLabel(p)}${p.updatedAt&&p.updatedAt!==p.date?'　更新 '+esc(new Date(p.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})):''} ${p.tags.map(esc).join(' / ')}</div>${p.title?`<h1>${esc(p.title)}</h1>`:''}${p.blocks.map(b=>b.type==='image'?`<figure><img src="${esc(b.src)}" alt="${esc(b.alt||'投稿画像')}">${b.alt?`<figcaption>${esc(b.alt)}</figcaption>`:''}</figure>`:b.type==='heading'?`<h2>${esc(b.text)}</h2>`:b.type==='quote'?`<blockquote>${esc(b.text)}</blockquote>`:b.type==='link'?`<p>${/^https?:\/\//i.test(b.url)?`<a href="${esc(b.url)}" target="_blank" rel="noopener noreferrer">${esc(b.text||b.url)}</a>`:'リンク先を確認してください'}</p>`:`<p>${esc(b.text)}</p>`).join('')}</div>`;}
+function renderContent(p){return `${p.sample?'<p class="hint">表示確認用の記事</p>':''}<div class="rendered"><div class="hint">${dateLabel(p)}${p.updatedAt&&p.updatedAt!==p.date?'　更新 '+esc(new Date(p.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})):''} ${p.tags.map(esc).join(' / ')}</div>${p.title?`<h1>${esc(p.title)}</h1>`:''}${p.blocks.map(b=>b.type==='image'?`<figure><img src="${esc(b.src)}" alt="${esc(b.alt||'投稿画像')}">${b.alt?`<figcaption>${esc(b.alt)}</figcaption>`:''}</figure>`:b.type==='heading'?`<h2>${esc(b.text)}</h2>`:b.type==='quote'?`<blockquote>${esc(b.text)}</blockquote>`:b.type==='link'?`<p>${/^https?:\/\//i.test(b.url)?`<a href="${esc(b.url)}" target="_blank" rel="noopener noreferrer">${esc(b.text||b.url)}</a>`:'リンク先を確認してください'}</p>`:`<p>${esc(b.text)}</p>`).join('')}</div>`;}
 function openDetail(p){$('#detailLabel').textContent='プレビュー';$('#detailContent').innerHTML=renderContent(p);$('#detailActions').innerHTML='';$('#detail').showModal();}
 function resize(el){el.style.height='0';el.style.height=Math.max(46,el.scrollHeight)+'px';}
 function focusPiece(i){activeIndex=i;const b=editing.blocks[i];$('#format').value=['paragraph','heading','quote'].includes(b?.type)?b.type:'paragraph';}
@@ -44,7 +45,7 @@ async function addFiles(files,position){if(uploading)return;setUploading(true);c
 
 const basePage='/admin';
 const postURL=p=>basePage+'?post='+encodeURIComponent(p.id);
-function editPost(p){if(state.draft&&state.draft.id!==p.id){message('編集中の下書きがあります 下書きから再開してください');return;}openEditor(p);}
+function editPost(p){if(!p||p.sample)return;if(state.draft&&state.draft.id!==p.id){message('編集中の下書きがあります 下書きから再開してください');return;}openEditor(p);}
 async function unpublish(postId){try{await persist('unpublish',null,postId);render();message('非公開にしました');}catch(e){message(e.message);}}
 function renderPage(){
  const query=new URLSearchParams(location.search),postId=query.get('post');const articlePage=$('#articlePage');const collection=query.has('collections');const detail=!!postId||collection;
@@ -52,9 +53,9 @@ function renderPage(){
  if(!detail)return;
  if(collection){articlePage.innerHTML='<a href="'+basePage+'">一覧へ戻る</a><h1>作品集</h1><div class="collectionlinks">'+[...new Set(allPosts().filter(collectionEligible).flatMap(p=>p.tags))].map(t=>`<a href="${basePage}?works=1&theme=${encodeURIComponent(t)}">${esc(t)}</a>`).join('')+'</div>';return;}
  const p=allPosts().find(p=>p.id===postId);
- articlePage.innerHTML=`<a href="${basePage}">一覧へ戻る</a>`+(p?renderContent(p):'<h1>投稿が見つかりません</h1>')+(p?'<div class="post-management"><button id="pageEdit">'+'編集'+'</button>'+(p.visibility==='public'?'<button id="pagePrivate">非公開にする</button>':'')+'</div>':'');
+ articlePage.innerHTML=`<a href="${basePage}">一覧へ戻る</a>`+(p?renderContent(p):'<h1>投稿が見つかりません</h1>')+(p&&!p.sample?'<div class="post-management"><button id="pageEdit">'+'編集'+'</button>'+(p.visibility==='public'?'<button id="pagePrivate">非公開にする</button>':'')+'</div>':'');
  document.title=p?(p.title||'投稿')+' | Brand-new TOKYO':'投稿が見つかりません | Brand-new TOKYO';
- if(p)$('#pageEdit').onclick=()=>editPost(p);if($('#pagePrivate'))$('#pagePrivate').onclick=()=>unpublish(p.id);
+ if(p&&!p.sample)$('#pageEdit').onclick=()=>editPost(p);if($('#pagePrivate'))$('#pagePrivate').onclick=()=>unpublish(p.id);
 }
 
 search=new URLSearchParams(location.search).get('search')||'';$('#search').value=search;tag=new URLSearchParams(location.search).get('theme')||'';view=new URLSearchParams(location.search).get('view')||'all';$$('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===view)));
