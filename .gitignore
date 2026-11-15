@@ -9,3 +9,10 @@ dist/server/
 dist/.openai/
 
 .preview-data/
+
+# Private migration inputs and extracted data must never enter source control
+migration-private/
+*.sql
+*.sql.gz
+*.sqlite
+__pycache__/
