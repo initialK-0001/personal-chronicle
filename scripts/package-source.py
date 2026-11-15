@@ -2,9 +2,9 @@
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 root=Path(__file__).resolve().parent.parent
-paths=[root/'README.md',root/'AGENTS.md',root/'.gitignore']
-for folder in ['docs','scripts','dist']:
-    paths.extend(p for p in (root/folder).rglob('*') if p.is_file() and p.suffix not in ['.zip','.gz','.pyc'])
+paths=[root/'README.md',root/'AGENTS.md',root/'.gitignore',root/'package.json']
+for folder in ['docs','scripts','dist','server','tests']:
+    paths.extend(p for p in (root/folder).rglob('*') if p.is_file() and not (folder=='dist' and any(x in p.relative_to(root/folder).parts for x in ['server','.openai'])) and p.suffix not in ['.zip','.gz','.pyc'])
 with ZipFile(root/'dist/source.zip','w',ZIP_DEFLATED) as z:
     for p in sorted(set(paths)):
         z.write(p,'brand-new-tokyo/'+str(p.relative_to(root)))

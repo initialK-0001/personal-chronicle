@@ -1,0 +1,1 @@
+{"name":"personal-chronicle","private":true,"type":"module","scripts":{"dev":"node scripts/dev.mjs","build":"node scripts/build-worker.mjs","test":"node --test tests/api.test.mjs"}}
