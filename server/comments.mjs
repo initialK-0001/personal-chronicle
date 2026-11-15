@@ -11,14 +11,16 @@ export async function comments(request,env,prefix){
  if(input.etag!==(file?.etag||null))return respond({error:'別の画面で変更されています 再読み込みしてください'},409);
  const valid=(s,max)=>typeof s==='string'&&s.trim().length>0&&s.length<=max;
  if(input.action==='submit'){
-  if(!valid(input.name,80)||!valid(input.body,4000)||!valid(input.postId,80)||!/^[-\w]+$/.test(input.postId))return respond({error:'投稿先 名前 本文を確認してください'},400);
+  if((input.name!=null&&(typeof input.name!=='string'||input.name.length>80))||!valid(input.body,4000)||!valid(input.postId,80)||!/^[-\w]+$/.test(input.postId))return respond({error:'投稿先 名前 本文を確認してください'},400);
+  const postsFile=await env.BUCKET.get(prefix+'state.json');const posts=postsFile?(await postsFile.json()).posts:[];
+  if(!['sample-article','sample-pose','sample-gallery','sample-cover','sample-note','sample-thought'].includes(input.postId)&&!posts.some(p=>p.id===input.postId))return respond({error:'投稿がありません'},404);
   if(state.items.length>=1000)return respond({error:'コメントの保管上限に達しました'},413);
   if(state.items.some(x=>Date.now()-Date.parse(x.createdAt)<30000))return respond({error:'少し時間をおいて送信してください'},429);
-  state.items.push({id:crypto.randomUUID(),postId:input.postId,name:input.name.trim(),body:input.body.trim(),status:'pending',createdAt:new Date().toISOString(),reply:''});
+  state.items.push({id:crypto.randomUUID(),postId:input.postId,name:(input.name||'').trim()||'匿名',body:input.body.trim(),status:'pending',createdAt:new Date().toISOString(),reply:''});
  }else{
   const item=state.items.find(x=>x.id===input.id);if(!item)return respond({error:'コメントがありません'},404);
-  if(['approve','reject','spam','delete'].includes(input.action)){item.status={approve:'approved',reject:'rejected',spam:'spam',delete:'deleted'}[input.action];}
-  else if(input.action==='reply'&&typeof input.body==='string'&&input.body.length<=4000)item.reply=input.body.trim();
+  if(['approve','delete'].includes(input.action)){item.status={approve:'approved',reject:'rejected',spam:'spam',delete:'deleted'}[input.action];}
+  else if(input.action==='reply'&&item.status==='approved'&&typeof input.body==='string'&&input.body.length<=4000)item.reply=input.body.trim();
   else return respond({error:'操作を確認してください'},400);
   item.updatedAt=new Date().toISOString();
  }
