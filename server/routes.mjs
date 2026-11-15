@@ -1,6 +1,6 @@
 import {adminStatus,accessDenied} from './access.mjs';
 import {api} from './api.mjs';
-const publicAssets=new Set(['/index.html','/public.js','/style.css','/assets/pose.png','/assets/peace.png','/assets/style.png','/assets/cover.jpg','/assets/expression.jpg']);
+const publicAssets=new Set(['/index.html','/public.js','/timeline.js','/style.css','/assets/pose.png','/assets/peace.png','/assets/style.png','/assets/cover.jpg','/assets/expression.jpg']);
 export async function handle(request,env,assets){
  const url=new URL(request.url);
  if(url.pathname.startsWith('/api/'))return api(request,env);

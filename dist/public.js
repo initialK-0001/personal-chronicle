@@ -1,3 +1,4 @@
+import {timelineHTML} from './timeline.js';
 'use strict';
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,16 +13,37 @@ const samples=[
 {id:'sample-note',title:'',tags:['メモ'],date:'2022-04-30T12:00',sample:true,blocks:[textBlock('短文投稿の表示見本\n\nタイトルなしでも本文から表示\n画像や文章はあとから追加可能')]},
 {id:'sample-thought',title:'制作記録の表示見本',tags:['制作記録'],date:'2022-04-29T10:00',sample:true,blocks:[textBlock('画像と文章を同じ投稿に保存'),{id:id(),type:'heading',text:'記録する項目'},textBlock('使用したモデル\nポーズと表情\n撮影設定\n変更した箇所') ]}
 ];
-let state={posts:[]},view='all',search='',tag='',layout='grid';
+let state={posts:[]},view='all',search='',tag='';
 const prose=p=>p.blocks.filter(b=>b.type==='paragraph'||b.type==='quote').map(b=>b.text).join('\n');
 const dateLabel=p=>p.date?esc(new Date(p.date).toLocaleDateString('ja-JP',{timeZone:'Asia/Tokyo'})):'';
 const allPosts=()=>[...state.posts,...samples];
 function filtered(){const pool=allPosts();return pool.filter(p=>(view!=='images'||p.blocks.some(b=>b.type==='image'))&&(view!=='articles'||prose(p).trim())&&(!tag||p.tags.includes(tag))&&(!search||[p.title,prose(p),...p.tags].join(' ').toLowerCase().includes(search.toLowerCase()))).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
-function render(){const posts=filtered();$('#feed').className='feed '+(layout==='list'?'list':'');$('#empty').hidden=!!posts.length;$('#pageTitle').textContent=search?'検索結果':tag||'投稿一覧';$('#activeFilters').innerHTML=[search?`<span>検索 ${esc(search)}</span>`:'',tag?`<span>${esc(tag)}</span>`:'',(tag||search)?'<button id="resetSearch">条件を解除</button>':''].join('');$('#resetSearch')?.addEventListener('click',clearFilters);
-$('#feed').innerHTML=posts.map(p=>{const images=p.blocks.filter(b=>b.type==='image');const body=prose(p);return `<button class="post" data-id="${esc(p.id)}" aria-label="${esc(p.title||body.slice(0,35)||'画像の投稿')}を開く"><div class="cover ${images.length?'':'textcover'}">${images.length?`<img src="${esc(images[0].src)}" alt="${esc(images[0].alt||'投稿画像')}" loading="lazy">${images.length>1?'<span class="imageflag">複数画像</span>':''}`:`<p>${esc(body||p.title)}</p>`}</div><div class="postbody">${p.title?`<h2>${esc(p.title)}</h2>`:''}<div class="meta">${dateLabel(p)}${p.sample?'':''}</div><div class="category">${p.tags.map(esc).join(' / ')}</div><p class="excerpt">${esc(body.slice(0,220))}</p></div></button>`;}).join('');$$('#feed .post').forEach(el=>el.onclick=()=>openDetail(posts.find(p=>p.id===el.dataset.id)));
-const themes=['すべて',...new Set(allPosts().flatMap(p=>p.tags))];$('#themes').innerHTML=themes.map(t=>`<button data-tag="${esc(t)}" class="${(t==='すべて'&&!tag)||tag===t?'active':''}">${esc(t)}</button>`).join('');$$('#themes button').forEach(b=>b.onclick=()=>{tag=b.dataset.tag==='すべて'?'':b.dataset.tag;render();});}
-function clearFilters(){search='';tag='';view='all';$('#search').value='';$$('[data-view]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.view==='all')));render();}
+function render(){const posts=filtered();$('#feed').className='feed timeline';$('#empty').hidden=!!posts.length;$('#pageTitle').textContent=search?'検索結果':tag||'投稿一覧';$('#activeFilters').innerHTML=[search?`<span>検索 ${esc(search)}</span>`:'',tag?`<span>${esc(tag)}</span>`:'',(tag||search)?'<button id="resetSearch">条件を解除</button>':''].join('');$('#resetSearch')?.addEventListener('click',clearFilters);
+$('#feed').innerHTML=posts.map(p=>timelineHTML(p,postURL(p),false)).join('');
+ $$('#feed [data-destination]').forEach(el=>el.onclick=e=>{if(!e.target.closest('a,button')&&!window.getSelection()?.toString())location.href=el.dataset.destination;});
+ $$('#feed [data-edit]').forEach(el=>el.onclick=()=>editPost(allPosts().find(p=>p.id===el.dataset.edit)));
+ renderPage();
+const themes=['すべて',...new Set(allPosts().flatMap(p=>p.tags))];$('#themes').innerHTML=themes.map(t=>`<button data-tag="${esc(t)}" class="${(t==='すべて'&&!tag)||tag===t?'active':''}">${esc(t)}</button>`).join('');$$('#themes button').forEach(b=>b.onclick=()=>{tag=b.dataset.tag==='すべて'?'':b.dataset.tag;if(location.search){location.href=basePage+'?theme='+encodeURIComponent(tag);return;}render();});}
+function clearFilters(){if(location.search){location.href=basePage;return;}search='';tag='';view='all';$('#search').value='';$$('[data-view]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.view==='all')));render();}
 function renderContent(p){return `<div class="rendered"><div class="hint">${dateLabel(p)}${p.updatedAt&&p.updatedAt!==p.date?'　更新 '+esc(new Date(p.updatedAt).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})):''} ${p.tags.map(esc).join(' / ')}</div>${p.title?`<h1>${esc(p.title)}</h1>`:''}${p.blocks.map(b=>b.type==='image'?`<figure><img src="${esc(b.src)}" alt="${esc(b.alt||'投稿画像')}">${b.alt?`<figcaption>${esc(b.alt)}</figcaption>`:''}</figure>`:b.type==='heading'?`<h2>${esc(b.text)}</h2>`:b.type==='quote'?`<blockquote>${esc(b.text)}</blockquote>`:b.type==='link'?`<p>${/^https?:\/\//i.test(b.url)?`<a href="${esc(b.url)}" target="_blank" rel="noopener noreferrer">${esc(b.text||b.url)}</a>`:'リンク先を確認してください'}</p>`:`<p>${esc(b.text)}</p>`).join('')}</div>`;}
-function openDetail(p){$('#detailLabel').textContent=p.sample?'表示見本':'';$('#detailContent').innerHTML=renderContent(p);$('#detailActions').innerHTML='';$('#detail').showModal();}
-$$('[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;$$('[data-view]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render();});$$('[data-layout]').forEach(b=>b.onclick=()=>{layout=b.dataset.layout;$$('[data-layout]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render();});$('#search').oninput=e=>{search=e.target.value;render();};$('#searchForm').onsubmit=e=>{e.preventDefault();search=$('#search').value;render();};$('#brand').onclick=clearFilters;$('#clearFilters').onclick=clearFilters;$('#collectionsButton').onclick=()=>{const topics=[...new Set(allPosts().flatMap(p=>p.tags))];$('#detailLabel').textContent='作品集';$('#detailContent').innerHTML='<div class="collectionlinks">'+topics.map(t=>`<button data-topic="${esc(t)}">${esc(t)}</button>`).join('')+'</div>';$('#detailActions').innerHTML='';$$('[data-topic]').forEach(b=>b.onclick=()=>{clearFilters();tag=b.dataset.topic;render();$('#detail').close();});$('#detail').showModal();};
-$('#closeDetail').onclick=()=>$('#detail').close();render();
+
+
+const basePage='/';
+const postURL=p=>basePage+'?post='+encodeURIComponent(p.id);
+function editPost(p){}
+function renderPage(){
+ const query=new URLSearchParams(location.search),postId=query.get('post');const articlePage=$('#articlePage');const collection=query.has('collections');const detail=!!postId||collection;
+ $('#feed').hidden=detail;$('#empty').hidden=detail||!!filtered().length;$('.resulthead').hidden=detail;$('#activeFilters').hidden=detail;articlePage.hidden=!detail;
+ if(!detail)return;
+ if(collection){articlePage.innerHTML='<a href="'+basePage+'">一覧へ戻る</a><h1>作品集</h1><div class="collectionlinks">'+[...new Set(allPosts().flatMap(p=>p.tags))].map(t=>`<a href="${basePage}?theme=${encodeURIComponent(t)}">${esc(t)}</a>`).join('')+'</div>';return;}
+ const p=allPosts().find(p=>p.id===postId);
+ articlePage.innerHTML=`<a href="${basePage}">一覧へ戻る</a>`+(p?renderContent(p):'<h1>投稿が見つかりません</h1>')+'';
+ document.title=p?(p.title||'投稿')+' | Brand-new TOKYO':'投稿が見つかりません | Brand-new TOKYO';
+ 
+}
+
+search=new URLSearchParams(location.search).get('search')||'';$('#search').value=search;tag=new URLSearchParams(location.search).get('theme')||'';view=new URLSearchParams(location.search).get('view')||'all';$$('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===view)));
+
+$$('[data-view]').forEach(b=>b.onclick=()=>{if(location.search){location.href=basePage+'?view='+b.dataset.view;return;}view=b.dataset.view;$$('[data-view]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render();});$('#search').oninput=e=>{search=e.target.value;render();};$('#searchForm').onsubmit=e=>{e.preventDefault();search=$('#search').value;if(location.search){location.href=basePage+'?search='+encodeURIComponent(search);return;}render();};$('#brand').onclick=clearFilters;$('#clearFilters').onclick=clearFilters;$('#collectionsButton').onclick=()=>{location.href=basePage+'?collections=1';};
+
+render();

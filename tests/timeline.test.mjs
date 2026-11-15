@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {summary,shownBlocks,timelineHTML,characters} from '../dist/timeline.js';
+const post=(text,images=0)=>({id:'test',title:'',tags:[],blocks:[{type:'paragraph',text},...Array.from({length:images},()=>({type:'image',src:'photo.png',alt:'作品'}))]});
+test('140 characters stay complete and 141 link to article',()=>{const short=post('あ'.repeat(140)),long=post('あ'.repeat(141));assert.equal(summary(short).truncated,false);assert.equal(summary(long).truncated,true);assert.equal(shownBlocks(short)[0].text,short.blocks[0].text);assert.equal(characters(shownBlocks(long)[0].text).length,140);assert.doesNotMatch(timelineHTML(short,'/?post=test'),/readmore/);assert.match(timelineHTML(long,'/?post=test'),/href="\/\?post=test"/)});
+test('one image stays intact and two images lead to complete page',()=>{assert.equal(summary(post('',1)).truncated,false);const gallery=post('',2);assert.equal(summary(gallery).truncated,true);assert.equal(shownBlocks(gallery).filter(b=>b.type==='image').length,1);assert.equal(shownBlocks(gallery,true).filter(b=>b.type==='image').length,2)});
+test('emoji counted as visible characters and text budget spans blocks',()=>{const emoji='👨‍👩‍👧‍👦';assert.equal(summary(post(emoji.repeat(140))).truncated,false);const p=post('あ'.repeat(100));p.blocks.push({type:'heading',text:'い'.repeat(41)});assert.equal(summary(p).truncated,true);assert.equal(characters(shownBlocks(p)[1].text).length,40)});
+test('mixed content preserves order and escapes text',()=>{const p=post('<script>alert(1)</script>',1);assert.deepEqual(shownBlocks(p),p.blocks);assert.match(timelineHTML(p,'/?post=test'),/&lt;script&gt;/);assert.doesNotMatch(timelineHTML(p,'/?post=test'),/<script>/)});
