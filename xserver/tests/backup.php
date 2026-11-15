@@ -1,0 +1,28 @@
+<?php
+declare(strict_types=1);
+require __DIR__.'/../src/Store.php';require __DIR__.'/../src/Media.php';require __DIR__.'/../src/Legacy.php';require __DIR__.'/../src/Comments.php';require __DIR__.'/../src/Backup.php';
+use Chronicle\Store;use Chronicle\Backup;
+function check($b,$m){if(!$b)throw new RuntimeException($m);}
+function rejects(callable $f){$failed=false;try{$f();}catch(RuntimeException $e){$failed=true;}check($failed,'拒否されなかった');}
+$root=sys_get_temp_dir().'/chronicle-backup-test-'.bin2hex(random_bytes(8));mkdir($root,0700);
+function config(string $root,string $name):array{mkdir($root.'/'.$name,0700);mkdir($root.'/'.$name.'/images',0700);mkdir($root.'/'.$name.'/legacy',0700);return ['images'=>$root.'/'.$name.'/images','legacy_uploads'=>$root.'/'.$name.'/legacy'];}
+try{
+ $src=config($root,'source');$s=new Store(new PDO('sqlite:'.$root.'/source.sqlite'));$s->initialize();
+ $im=imagecreatetruecolor(2,2);ob_start();imagepng($im);$image=(new Chronicle\Media($s,$src['images']))->upload(ob_get_clean());
+ $p=['title'=>'公開記事','tags'=>['記録'],'blocks'=>[['type'=>'image','src'=>$image['src']],['type'=>'paragraph','text'=>'公開版']]];$s->create($p);$s->change(1,1,'release');$p['blocks'][1]['text']='未公開の追記';$s->change(1,2,'draft',$p);$s->create(['title'=>'下書き','tags'=>[],'blocks'=>[['type'=>'paragraph','text'=>'非公開']]]);
+ $s->stageImport([['legacy_id'=>10,'path'=>'/old','status'=>'publish','original_html'=>'元本文','original_record'=>['post_password'=>'']]]);
+ $s->db->exec("INSERT INTO chronicle_downloads VALUES(7,'{\"files\":[\"test.bin\"]}')");mkdir($src['legacy_uploads'].'/download-manager-files',0700);file_put_contents($src['legacy_uploads'].'/download-manager-files/test.bin',"original\0file");
+ $comments=new Chronicle\Comments($s,new Chronicle\Legacy($s,true),str_repeat('x',32));$comments->submit(['post'=>'1','body'=>'承認する本文'],'test');$comments->change(1,1,'approve');$comments->change(1,2,'reply','返信');$comments->submit(['post'=>'1','body'=>'未承認の本文'],'test');
+ $summary=Backup::export($s,$src,$root.'/backup');check($summary['chronicle_comments']===2,'コメント保全');
+ rejects(fn()=>Backup::export($s,$src,$root.'/backup'));rejects(fn()=>Backup::export($s,$src,$src['legacy_uploads'].'/recursive'));
+ $target=config($root,'restored');$t=new Store(new PDO('sqlite:'.$root.'/target.sqlite'));$t->initialize();Backup::restore($t,$target,$root.'/backup');
+ check(Store::json($s->state())===Store::json($t->state()),'投稿状態一致');check($s->publicPosts()===$t->publicPosts(),'公開版一致');check(!str_contains(Store::json($t->publicPosts()),'未公開'),'下書き漏れなし');
+ $manifest=json_decode(file_get_contents($root.'/backup/manifest.json'),true);foreach($manifest['rows'] as $table=>$count){$a=$s->db->query('SELECT * FROM '.$table)->fetchAll();$b=$t->db->query('SELECT * FROM '.$table)->fetchAll();check($a===$b,$table.'全列一致');}
+ check(file_get_contents($target['legacy_uploads'].'/download-manager-files/test.bin')==="original\0file",'旧ファイル一致');check(hash_file('sha256',$target['images'].'/'.basename($image['src']))===basename($image['src']),'新画像一致');
+ $next=$t->create(['title'=>'次','tags'=>[],'blocks'=>[]]);check((int)$next['id']===3,'採番継続');rejects(fn()=>Backup::restore($t,$target,$root.'/backup'));
+ $evil=json_decode(file_get_contents($root.'/backup/manifest.json'),true);$evil['files']['legacy/../../escape']=str_repeat('0',64);file_put_contents($root.'/backup/manifest.json',Store::json($evil));
+ $empty=config($root,'corrupt-target');$u=new Store(new PDO('sqlite::memory:'));$u->initialize();rejects(fn()=>Backup::restore($u,$empty,$root.'/backup'));file_put_contents($root.'/backup/manifest.json',Store::json($manifest));file_put_contents($root.'/backup/database.json','broken');rejects(fn()=>Backup::restore($u,$empty,$root.'/backup'));check($u->state()['state']['posts']===[],'破損時DB変更なし');check(count(scandir($empty['images']))===2,'破損時画像変更なし');
+ echo "投稿・公開分離・履歴・コメント・画像・旧添付の復元一致と破損/上書き拒否を検証成功\n";
+}finally{
+ $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);foreach($it as $f){if($f->isDir())rmdir($f->getPathname());else unlink($f->getPathname());}rmdir($root);
+}

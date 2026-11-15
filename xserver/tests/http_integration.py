@@ -101,5 +101,8 @@ with tempfile.TemporaryDirectory() as tmp:
   t=call(anon,'/api/session')[1]['csrf']
   for _ in range(8):assert call(anon,'/api/login',{'password':'wrong'},t)[0]==401
   assert call(anon,'/api/login',{'password':'wrong'},t)[0]==429
+  # A restore target cannot serve HTTP while offline_restore is enabled.
+  restore_cfg=json.loads((p/'config.json').read_text());restore_cfg['offline_restore']=True;(p/'config.json').write_text(json.dumps(restore_cfg))
+  assert call(anon,'/api/public/posts')[0]==503
   print('HTTP認証・CSRF・2セッション・公開分離・競合・ログアウト・試行制限の検証成功')
  finally:server.terminate();server.wait(timeout=5)

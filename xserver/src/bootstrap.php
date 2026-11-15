@@ -11,6 +11,7 @@ function chronicle_boot():array {
     $config=json_decode(file_get_contents($path),true,512,JSON_THROW_ON_ERROR);
     foreach(['dsn','origin','password_hash','rate_secret','sessions'] as $key)if(!is_string($config[$key]??null)||$config[$key]==='')throw new Chronicle\Failure('設定を確認してください',503);
     $local=($config['local_test']??false)===true;
+    if(PHP_SAPI!=='cli'&&($config['offline_restore']??false)===true)throw new Chronicle\Failure('復元作業中です',503);
     if($local&&!preg_match('~^http://127\.0\.0\.1:\d+$~D',$config['origin']))throw new Chronicle\Failure('テスト環境の指定が不正です',503);
     if(!$local&&!preg_match('~^https://[A-Za-z0-9.-]+(?::\d+)?$~D',$config['origin']))throw new Chronicle\Failure('HTTPSの設定を確認してください',503);
     if(!password_get_info($config['password_hash'])['algo']||strlen($config['rate_secret'])<32)throw new Chronicle\Failure('認証設定を確認してください',503);
