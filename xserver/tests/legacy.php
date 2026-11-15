@@ -12,3 +12,7 @@ check((new Chronicle\Legacy($s,false))->records()===[]);
 $l=new Chronicle\Legacy($s,true);check(count($l->records())===1);check($l->find('/private')===null);check($l->find('/locked')===null);
 $h=$l->html($r['original_html']);foreach(['<script','onerror','javascript:'] as $bad)check(!str_contains($h,$bad));check(str_contains($h,'wpdmdl=42'));check(str_contains($h,'https://example.org/'));
 check(count($l->posts())===1);echo "旧記事の公開制御・HTML無害化・リンク変換の検証成功\n";
+
+$tagged=new Chronicle\Legacy($s,true,'test-22');check(str_contains($tagged->html('[amazonjs asin="1234567890" title="商品"]'),'?tag=test-22'));
+$embeds=$l->html('<iframe src="https://www.youtube.com/embed/abc"></iframe><iframe src="https://www.google.com/maps/embed?pb=test"></iframe><iframe src="https://evil.example/embed/abc"></iframe><iframe src="https://www.youtube.com.evil.example/embed/abc"></iframe>');
+check(substr_count($embeds,'<iframe')===2);check(!str_contains($embeds,'evil.example'));echo "広告タグ保持・埋込先の限定を検証成功\n";

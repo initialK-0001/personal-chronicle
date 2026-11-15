@@ -21,6 +21,8 @@ for name in ['style.css','timeline.js','index.html','public.js','admin.html','ad
   old="function openEditor(p){editing=structuredClone(p?(state.draft?.id===p.id?state.draft:p):(state.draft||{id:id(),title:'',tags:[],date:null,blocks:[textBlock('')]}));"
   new="async function openEditor(p){if(!p){try{const r=await requestAPI('/api/admin/posts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'',tags:[],blocks:[textBlock('')]})});const fresh=await requestAPI('/api/state');state=fresh.state;etag=fresh.etag;p=state.posts.find(x=>x.id===String(r.post.id));}catch(e){message(e.message);return;}}editing=structuredClone(p);"
   assert old in s;s=s.replace(old,new)
+  s=s.replace("async function openEditor(p){", "async function openEditor(p){if(openEditor.busy)return;openEditor.busy=true;$('#newButton').disabled=true;try{")
+  s=s.replace("$('#writing textarea')?.focus();}", "$('#writing textarea')?.focus();}finally{openEditor.busy=false;$('#newButton').disabled=false;}}")
   s=s.replace("if(state.draft&&state.draft.id!==p.id){message('編集中の下書きがあります 下書きから再開してください');return;}",'')
   s=s.replace("$('#draftButton').onclick=()=>state.draft?openEditor():message('下書きはありません');","$('#draftButton').onclick=()=>{view='all';search='';tag='';render();$('#feed').innerHTML=state.posts.filter(p=>!p.date).map(p=>timelineHTML(p,postURL(p),true)).join('');$$('#feed [data-edit]').forEach(b=>b.onclick=()=>openEditor(state.posts.find(p=>p.id===b.dataset.edit)));};")
   s=s.replace("'image/webp','image/gif'","'image/webp'")

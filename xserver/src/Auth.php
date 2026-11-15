@@ -7,7 +7,7 @@ final class Auth {
     public function __construct(Store $store,array $config){$this->store=$store;$this->config=$config;}
     public function start():void {
         if(!is_dir($this->config['sessions']))throw new Failure('セッション保存先を確認してください',503);
-        ini_set('session.use_strict_mode','1');ini_set('session.use_only_cookies','1');ini_set('session.use_trans_sid','0');
+        ini_set('session.gc_maxlifetime',(string)(8*3600));ini_set('session.use_strict_mode','1');ini_set('session.use_only_cookies','1');ini_set('session.use_trans_sid','0');
         session_name('chronicle_session');session_save_path($this->config['sessions']);
         session_set_cookie_params(['lifetime'=>0,'path'=>'/','secure'=>!($this->config['local_test']??false),'httponly'=>true,'samesite'=>'Strict']);session_start();
         if(isset($_SESSION['admin'])&&($_SESSION['expires']??0)<time()){$_SESSION=[];session_regenerate_id(true);}

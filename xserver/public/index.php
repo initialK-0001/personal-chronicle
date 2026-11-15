@@ -3,11 +3,11 @@ declare(strict_types=1);
 ini_set('display_errors','0');
 require __DIR__.'/../src/bootstrap.php';
 header('Content-Type: application/json; charset=UTF-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('X-Frame-Options: DENY');header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
-function serveHTML(string $html):void{header('Content-Type: text/html; charset=UTF-8');header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");echo $html;exit;}
+function serveHTML(string $html):void{header('Content-Type: text/html; charset=UTF-8');header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; frame-src https://www.youtube.com https://www.google.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");echo $html;exit;}
 function respond($data,int $status=200):void{http_response_code($status);echo Chronicle\Store::json($data);exit;}
 try {
     [$store,$config]=chronicle_boot();
-    $legacy=new Chronicle\Legacy($store,($config['legacy_public_enabled']??false)===true);
+    $legacy=new Chronicle\Legacy($store,($config['legacy_public_enabled']??false)===true,$config['legacy_amazon_tag']??'');
     $path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);$method=$_SERVER['REQUEST_METHOD'];
     if($path==='/api/public/posts'){
         if($method!=='GET')throw new Chronicle\Failure('未対応の操作です',405);
@@ -41,7 +41,7 @@ try {
         $version=$input['etag'][(string)$id]??null;if(!is_int($version))throw new Chronicle\Failure('投稿を読み直してください',409);
         $store->change((int)$id,$version,$input['action']??'', $input['post']??null);respond($store->state((int)$id));
     }
-    if($path==='/admin/legacy'&&$method==='GET'){$preview=new Chronicle\Legacy($store,true);$r=$preview->find($_GET['path']??'');if(!$r)throw new Chronicle\Failure('記事がありません',404);serveHTML($preview->page($r));}
+    if($path==='/admin/legacy'&&$method==='GET'){$preview=new Chronicle\Legacy($store,true,$config['legacy_amazon_tag']??'');$r=$preview->find($_GET['path']??'');if(!$r)throw new Chronicle\Failure('記事がありません',404);serveHTML($preview->page($r));}
     if($path==='/api/logout'&&$method==='POST'){$auth->logout();respond(['authenticated'=>false]);}
     if($path==='/api/admin/posts'&&$method==='POST')respond(['post'=>$store->create($input)],201);
     if(preg_match('~^/api/admin/posts/([1-9][0-9]*)$~D',$path,$m)){

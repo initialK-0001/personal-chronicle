@@ -3,21 +3,23 @@ declare(strict_types=1);
 namespace Chronicle;
 require_once __DIR__.'/../vendor/autoload.php';
 final class Legacy {
-    private Store $store;private bool $enabled;
-    public function __construct(Store $store,bool $enabled){$this->store=$store;$this->enabled=$enabled;}
+    private Store $store;private bool $enabled;private string $amazonTag;
+    public function __construct(Store $store,bool $enabled,string $amazonTag=""){$this->store=$store;$this->enabled=$enabled;$this->amazonTag=preg_match("/^[A-Za-z0-9_-]{1,100}$/D",$amazonTag)?$amazonTag:"";}
     public function records():array{
         if(!$this->enabled)return [];
         $out=[];foreach($this->store->db->query("SELECT original_json FROM chronicle_imports WHERE original_status='publish'")->fetchAll() as $row){$r=json_decode($row['original_json'],true,512,JSON_THROW_ON_ERROR);if(($r['original_record']['post_password']??'')==='')$out[]=$r;}return $out;
     }
     public function find(string $path):?array{foreach($this->records() as $r)if(rtrim(rawurldecode($r['path']),'/')===rtrim(rawurldecode($path),'/'))return $r;return null;}
     public function html(string $raw):string{
+        // Normalize only the known YouTube embed host; repair old malformed attributes without executing source HTML.
+        $raw=preg_replace_callback('~(<iframe\b[^>]*\bsrc=)(["\'])(.*?)\2~is',function($m){$url=html_entity_decode($m[3],ENT_QUOTES,'UTF-8');if(preg_match('~^(?:https?:)?//www\.youtube\.com/embed/([A-Za-z0-9_-]+)(?:[?]|$)~',$url,$v))$url='https://www.youtube.com/embed/'.$v[1];return $m[1].$m[2].htmlspecialchars($url,ENT_QUOTES,'UTF-8').$m[2];},$raw);
         $raw=preg_replace_callback('/\[blogcard\s+([^\]]+)\]/i',function($m){preg_match('/url=["\']([^"\']+)["\']/',$m[1],$a);return isset($a[1])?'<p><a href="'.htmlspecialchars($a[1],ENT_QUOTES).'">'.htmlspecialchars($a[1]).'</a></p>':htmlspecialchars($m[0]);},$raw);
-        $raw=preg_replace_callback('/\[amazonjs\s+([^\]]+)\]/i',function($m){preg_match('/asin=["\']([A-Z0-9]{10})["\']/i',$m[1],$a);preg_match('/title=["\']([^"\']+)["\']/',$m[1],$t);return isset($a[1])?'<p><a href="https://www.amazon.co.jp/dp/'.$a[1].'">'.htmlspecialchars($t[1]??'Amazonで商品を見る').'</a></p>':htmlspecialchars($m[0]);},$raw);
+        $raw=preg_replace_callback('/\[amazonjs\s+([^\]]+)\]/i',function($m){preg_match('/asin=["\']([A-Z0-9]{10})["\']/i',$m[1],$a);preg_match('/title=["\']([^"\']+)["\']/',$m[1],$t);return isset($a[1])?'<p><a href="https://www.amazon.co.jp/dp/'.$a[1].($this->amazonTag!==''?'?tag='.rawurlencode($this->amazonTag):'').'">'.htmlspecialchars($t[1]??'Amazonで商品を見る').'</a></p>':htmlspecialchars($m[0]);},$raw);
         $raw=preg_replace_callback('/\[wpdm_package\s+([^\]]+)\]/i',function($m){preg_match('/id=["\']?(\d+)/',$m[1],$a);return isset($a[1])?'<p><a href="/?wpdmdl='.$a[1].'">ファイルをダウンロード</a></p>':htmlspecialchars($m[0]);},$raw);
         $raw=preg_replace('/\[\/?caption\b[^\]]*\]/i','',$raw);
         $raw=preg_replace('/\[contact-form-7\b[^\]]*\]/i','<p>お問い合わせフォームは移行準備中です</p>',$raw);
-        $config=\HTMLPurifier_Config::createDefault();$config->set('Cache.DefinitionImpl',null);$config->set('HTML.Allowed','p,br,div,span,h1,h2,h3,h4,h5,h6,blockquote,pre,code,ul,ol,li,strong,b,em,i,u,s,del,table,thead,tbody,tr,th[colspan|rowspan],td[colspan|rowspan],a[href|title],img[src|alt|width|height],hr,sub,sup');$config->set('URI.AllowedSchemes',['http'=>true,'https'=>true,'mailto'=>true]);
-        return (new \HTMLPurifier($config))->purify($raw);
+        $config=\HTMLPurifier_Config::createDefault();$config->set('Cache.DefinitionImpl',null);$config->set('HTML.Allowed','p,br,div,span,h1,h2,h3,h4,h5,h6,blockquote,pre,code,ul,ol,li,strong,b,em,i,u,s,del,table,thead,tbody,tr,th[colspan|rowspan],td[colspan|rowspan],a[href|title],img[src|alt|width|height],iframe[src|width|height|title|frameborder],hr,sub,sup');$config->set('HTML.SafeIframe',true);$config->set('URI.SafeIframeRegexp','~^https://(?:www\.youtube\.com/embed/[A-Za-z0-9_-]+(?:[?][^\s]*)?|www\.google\.com/maps/embed(?:[?][^\s]*)?)$~D');$config->set('URI.AllowedSchemes',['http'=>true,'https'=>true,'mailto'=>true]);
+        return preg_replace('/<iframe(?![^>]*\bsrc=)[^>]*>.*?<\/iframe>/s','',(new \HTMLPurifier($config))->purify($raw));
     }
     public function posts():array{
         $out=[];foreach($this->records() as $r){if($r['type']!=='post')continue;$html=$this->html($r['original_html']);$blocks=[];

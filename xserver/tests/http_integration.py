@@ -57,7 +57,22 @@ with tempfile.TemporaryDirectory() as tmp:
   assert call(anon,public)[0]==404
   try:anon.open(origin+src);raise AssertionError('private image exposed')
   except urllib.error.HTTPError as e:assert e.code==401
-  assert call(a,'/api/state')[1]['state']['posts']
+  # Exercise the exact UI bridge, including reopen on a second session and stale saves.
+  status,initial,_=call(a,'/api/state');assert status==200 and initial['state']['posts']
+  draft=next(x for x in initial['state']['posts'] if x['id']==str(id));draft['blocks'][0]['text']='画面からの保存'
+  stale=initial['etag'].copy()
+  status,saved,_=call(a,'/api/state',{'action':'draft','post':draft,'etag':stale},token);assert status==200 and saved['state']['draft']['blocks'][0]['text']=='画面からの保存'
+  assert call(b,'/api/state')[1]['state']['posts'][-1]['blocks'][0]['text']=='画面からの保存'
+  assert call(b,'/api/state',{'action':'draft','post':draft,'etag':stale},t)[0]==409
+  assert call(a,'/api/state',{'action':'release','post':draft,'etag':saved['etag']},token)[0]==200
+  assert call(anon,'/api/public/posts')[1]['posts'][0]['blocks'][0]['text']=='画面からの保存'
+  fresh=call(a,'/api/state')[1]
+  assert call(a,'/api/state',{'action':'unpublish','id':str(id),'etag':fresh['etag']},token)[0]==200
+  assert call(anon,'/api/public/posts')[1]['posts']==[]
+  assert a.open(origin+'/admin').status==200
+  assert '投稿' in a.open(origin+'/admin').read().decode()
+  assert anon.open(origin+'/admin').geturl()==origin+'/login'
+  assert 'noindex' in anon.open(origin+'/login').read().decode()
   assert call(a,'/api/logout',{},token)[0]==200
   assert call(a,f'/api/admin/posts/{id}')[0]==401
   t=call(anon,'/api/session')[1]['csrf']

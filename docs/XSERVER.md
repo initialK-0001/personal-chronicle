@@ -58,7 +58,7 @@ HTTP試験は一時ディレクトリ・乱数のテスト認証情報・ロー�
 ## 本番切替前に残る作業
 
 1. 実ブラウザーでの投稿から再編集までの通し確認 画像のEXIF回転補正 大容量時のメモリー確認。
-2. 旧記事全件の表示差分確認 Amazonアフィリエイト識別子の維持 旧記事の編集 お問い合わせフォーム対応。
+2. 旧記事全件の表示差分確認 AdSense実配信と広告設定の復元 旧記事の編集 お問い合わせフォーム対応。
 3. 一般コメント、広告、固定ページ、検索・SEO、一覧のページ分割。
 4. 実ホストPHP/DB/セッション・HTTPSでの検証、管理者認証設定、追加認証と復旧経路の確認。自作のアプリ認証層は本番前に再レビューする。
 5. 独立した全ファイルバックアップと復元試験、具体的な切替・戻し手順、利用者による切替承認。
@@ -72,7 +72,7 @@ PHP標準機能を使った小規模な実装として検証を始めた段階�
 - `scripts/build-xserver-ui.py` が承認済みUIからPHP用画面を生成する Sitesの試作画面は変更しない。ログイン・新規投稿・複数下書き・保存・公開更新・非公開化・ログアウトをPHPへ接続。試作用サンプルは含めない。
 - JPEG/PNG/WebPは8MiB・1600万画素まで GDでPNG再生成しメタデータを除去。画像は `images` で指定する公開領域外へ保存。公開スナップショットが参照する画像だけ匿名配信。EXIFの向き補正は未実装。
 - 旧記事表示は `legacy_public_enabled` が厳密にtrueの場合だけ有効 初期値false。元から公開されパスワードのない記事・固定ページのみ 元URLでサーバー側HTML表示。下書きと非公開記事は対象外。HTMLPurifierでスクリプトと危険な属性を除去。
-- blogcardはリンク amazonjsは商品リンク wpdm_packageは配布リンクへ変換。Amazonの広告識別子はまだ復元していない。contact-form-7は準備中の表示。未対応埋め込みを完全互換とは扱わない。
+- blogcardはリンク amazonjsは商品リンク wpdm_packageは配布リンクへ変換。Amazon広告識別子は設定 legacy_amazon_tag から付与する。contact-form-7は準備中の表示。未対応埋め込みを完全互換とは扱わない。
 - `legacy_uploads` はバックアップから分離した旧uploadsを指定し 公開記事に参照のある画像と公開設定済みの単一配布ファイルだけ返す。public配下に旧uploadsを直接置かない。管理者の旧記事プレビューは本文のみ対応し 非公開段階の旧画像プレビューは未対応。
 - `php xserver/tests/legacy.php` で公開状態・パスワード記事除外・HTML無害化・短縮コード変換を確認。HTTPテストは画像の公開前404・公開後200・非公開後404まで確認。PHP8.4で実施し MySQLは未検証。
 - 依存導入は xserver 内で `composer install --no-dev` ロックファイルを使用。2026-11-16のComposer監査で既知の脆弱性情報なし。
@@ -82,3 +82,14 @@ PHP標準機能を使った小規模な実装として検証を始めた段階�
 `python3 scripts/package-xserver.py /private/chronicle-code.zip` で依存を含むコードのみ梱包。設定・DB・移行JSONは含めない。`php xserver/bin/preflight.php` は書込みや取込みをせず環境を確認する。
 
 配備時は本体のsrc/ui/vendor/binを公開領域外に置き public/index.phpの参照先をその配置に合わせる。現在の相対配置は public をドキュメントルートにできる独立環境向けであり 既存public_htmlへそのまま全体を展開してはいけない。本番配置パスを確定してから入口ファイルを生成する。旧WordPressの停止・PHP変更・切替は未実施。
+
+## 2026-11-16 追加検証と配備入口
+
+- 公開192件の変換を監査し 画像868/868 埋め込み35/35 Amazon短縮コード198/198 配布リンク36/36を確認。`php xserver/bin/audit-legacy.php /private/posts-import-v2.json` で再現。画像ファイルの取得や全ページの目視を保証する件数ではない。
+- 地図はHTTPSのGoogle Maps embed 動画はYouTube embedだけを許可し 他ホストのiframeと任意scriptは除去。元のYouTube埋込2件はプロトコル省略・壊れた属性を表示時に正規化。Yahoo地図APIのscript2件は未移植で移行前に代替表示の確認が必要。
+- DB原本の対象テーブル wp319d61options を限定して広告設定を確認。AmazonJSの識別子とCocoon側の識別子は別だったため 一律置換しない。amazonjs変換用の legacy_amazon_tag にはAmazonJS側の確認値を配備時に設定する。広告ID/API秘密値をソースへ書き込まない。AdSense配信は未実装。
+- ブラウザーで確認したのは匿名公開画面の短文全文・長文概要・記事ページ遷移。管理画面のブラウザー操作は未確認で 認証・投稿・再編集・公開・非公開・端末間共有は実HTTPテストで検証した。
+- UI用 /api/state による下書き再保存 別セッションからの復元 古い版の409拒否 公開 非公開を確認。投稿ボタンの連打で新規下書きが重複する処理を抑制。セッション保管期限を認証期限8時間に合わせた。ブラウザー終了後のログイン保持は実装していない。
+- 本体を公開領域外へ配置後 `php xserver/bin/front-controller.php /private/config.json /absolute/public_html > /private/index.generated.php` で本番用入口を生成できる。生成物だけをpublic_html/index.phpに配置する（本番への配置は承認後）。Rewrite設定はpublic/.htaccessを使う。既存WordPressファイルと設定は退避・復旧手順を確定するまで変更しない。
+
+切替を止めている項目：管理画面のブラウザー確認 実ホストMySQL/HTTPS検証 AdSenseと旧地図の互換 旧記事編集・コメントのPHP対応 バックアップ復元と切替戻し手順。第2段階の展示機能は切替条件にしない。
