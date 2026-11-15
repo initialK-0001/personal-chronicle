@@ -1,4 +1,4 @@
-import {timelineHTML} from './timeline.js';
+import {timelineHTML,collectionEligible} from './timeline.js';
 'use strict';
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -26,7 +26,7 @@ function persist(action='draft',post=editing,postId){
  job.then(()=>{if(queued===job&&version===editVersion){dirty=false;$('#saveState').textContent='サーバーに保存済み';$('#connection').textContent='';}}).catch(e=>{$('#saveState').textContent='未保存';$('#connection').textContent=e.message;message(e.message);});return job;
 }
 function collect(){if(!editing)return;editing.title=$('#title').value;editing.tags=$('#tags').value.split(/[\s,、]+/).map(s=>s.trim()).filter(Boolean);dirty=true;editVersion++;$('#saveState').textContent='保存待ち';clearTimeout(saveTimer);saveTimer=setTimeout(()=>persist().catch(()=>{}),700);}
-function filtered(){const pool=allPosts();return pool.filter(p=>(view!=='images'||p.blocks.some(b=>b.type==='image'))&&(view!=='articles'||prose(p).trim())&&(!tag||p.tags.includes(tag))&&(!search||[p.title,prose(p),...p.tags].join(' ').toLowerCase().includes(search.toLowerCase()))).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
+function filtered(){const pool=new URLSearchParams(location.search).has('works')?allPosts().filter(collectionEligible):allPosts();return pool.filter(p=>(view!=='images'||p.blocks.some(b=>b.type==='image'))&&(view!=='articles'||prose(p).trim())&&(!tag||p.tags.includes(tag))&&(!search||[p.title,prose(p),...p.tags].join(' ').toLowerCase().includes(search.toLowerCase()))).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
 function render(){const posts=filtered();$('#feed').className='feed timeline';$('#empty').hidden=!!posts.length;$('#pageTitle').textContent=search?'検索結果':tag||'投稿一覧';$('#activeFilters').innerHTML=[search?`<span>検索 ${esc(search)}</span>`:'',tag?`<span>${esc(tag)}</span>`:'',(tag||search)?'<button id="resetSearch">条件を解除</button>':''].join('');$('#resetSearch')?.addEventListener('click',clearFilters);
 $('#feed').innerHTML=posts.map(p=>timelineHTML(p,postURL(p),true)).join('');
  $$('#feed [data-destination]').forEach(el=>el.onclick=e=>{if(!e.target.closest('a,button')&&!window.getSelection()?.toString())location.href=el.dataset.destination;});
@@ -55,7 +55,7 @@ function renderPage(){
  const query=new URLSearchParams(location.search),postId=query.get('post');const articlePage=$('#articlePage');const collection=query.has('collections');const detail=!!postId||collection;
  $('#feed').hidden=detail;$('#empty').hidden=detail||!!filtered().length;$('.resulthead').hidden=detail;$('#activeFilters').hidden=detail;articlePage.hidden=!detail;
  if(!detail)return;
- if(collection){articlePage.innerHTML='<a href="'+basePage+'">一覧へ戻る</a><h1>作品集</h1><div class="collectionlinks">'+[...new Set(allPosts().flatMap(p=>p.tags))].map(t=>`<a href="${basePage}?theme=${encodeURIComponent(t)}">${esc(t)}</a>`).join('')+'</div>';return;}
+ if(collection){articlePage.innerHTML='<a href="'+basePage+'">一覧へ戻る</a><h1>作品集</h1><div class="collectionlinks">'+[...new Set(allPosts().filter(collectionEligible).flatMap(p=>p.tags))].map(t=>`<a href="${basePage}?works=1&theme=${encodeURIComponent(t)}">${esc(t)}</a>`).join('')+'</div>';return;}
  const p=allPosts().find(p=>p.id===postId);
  articlePage.innerHTML=`<a href="${basePage}">一覧へ戻る</a>`+(p?renderContent(p):'<h1>投稿が見つかりません</h1>')+(p?'<div class="post-management"><button id="pageEdit">'+(p.sample?'コピーして編集':'編集')+'</button>'+(p.sample?'':'<button id="pagePrivate">下書きに戻す</button>')+'</div>':'');
  document.title=p?(p.title||'投稿')+' | Brand-new TOKYO':'投稿が見つかりません | Brand-new TOKYO';

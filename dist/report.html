@@ -1,8 +1,8 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Brand-new TOKYO 調査・基本設計</title><style>body{font-family:"Yu Gothic",Meiryo,sans-serif;background:#f7f5f0;color:#2b3027;margin:0;line-height:1.95}main{max-width:1000px;padding:30px 5% 80px;margin:auto}nav{position:sticky;top:0;background:#e9ecdf;padding:14px 5%;display:flex;gap:24px;border-bottom:1px solid #d1d7c4}a{color:#4e6045;text-underline-offset:4px}h1{font-family:"Yu Mincho",serif;font-weight:500;line-height:1.6}h2{font-size:25px;margin-top:65px;border-top:1px solid #d1d7c4;padding-top:25px}h3{font-size:19px;margin-top:30px}table{border-collapse:collapse;display:block;overflow:auto;font-size:13px;width:100%}td,th{padding:12px 15px;border:1px solid #d1d7c4;min-width:120px}th{background:#e9ecdf;text-align:left}code{background:#e9ecdf;padding:2px 5px;overflow-wrap:anywhere}p,li{overflow-wrap:anywhere}li{margin:8px 0}strong{color:#46533d}footer{border-top:1px solid #d1d7c4;margin-top:40px;padding-top:20px;font-size:13px}@media print{nav{display:none}main{max-width:none;padding:0}h2{break-after:avoid}table{display:table;font-size:10px}td,th{min-width:0;padding:6px}}</style></head><body><nav><a href="/admin">管理画面へ戻る</a><a href="PHASE0.md" download>設計書を保存</a><a href="source.zip" download>ソース一式を保存</a></nav><main><h1>Brand-new TOKYO 第0段階：現状調査・基本設計</h1>
-<p>調査日：2026年11月15日（日本時間）<br>状態：<strong>UI方向性の確認待ち。本格機能開発・移行・本番変更は未実施。</strong></p>
+<p>調査日：2026年11月15日（日本時間）<br>状態：<strong>UI方向性は承認済み。本格機能開発・移行・本番変更は未実施。</strong></p>
 <h2>0. 結論と今回の成果</h2>
 <p>「一つの投稿＝順序付きの画像と文章」を基本単位とする。最初に画像投稿・記事投稿などの形式を選ばせない。タイトルは空欄を許し、画像だけなら画像を、短文だけなら本文を主役にする。管理画面にも公開画面にも評価指標を持ち込まない。</p>
-<p>現在の提案は <strong>検索・テーマ・1列のタイムラインを中心とするタイムライン型UI</strong>。初回A/B案は利用者から不採用の意向が示され、廃止した。DMMブックスなどのECサイトの見やすさを参考にするという希望を受けた再提案であり、最終承認済みではない。</p>
+<p>現在の提案は <strong>検索・テーマ・1列のタイムラインを中心とするタイムライン型UI</strong>。初回A/B案は利用者から不採用の意向が示され、廃止した。DMMブックスなどのECサイトの見やすさを参考にするという希望を受けた再提案であり、2026-11-15に現行の画面構成が承認された。</p>
 <p>今回の試作：総合・画像・文章切替、検索、テーマ別一覧、作品集のテーマ選択、投稿日時の降順、画像一覧／詳細一覧、個別表示、統合編集、サーバー下書き保存と復元、一覧への配置と再編集、下書きへの戻し、JSON書き出し。実広告・認証・コメントサーバー・本番DB・予約公開・外部アプリ接続は未実装。</p>
 <p>最新の試作は認証付きサーバー保存へ変更。旧IndexedDBは書き出し用に残す。詳細は SERVER-STORAGE.md。試作保存先は本番保存先の決定ではない。見本画像は既存の公開ブログから取得した5ファイル。実際の新しい制作活動や感想を捏造しないため、見本文は試作用と表示している。</p>
 <h2>1. 既存サイトの構成調査</h2>
@@ -396,4 +396,6 @@
 </ul>
 <h3>記事一覧のサムネイル修正（2026-11-15）</h3>
 <p>添付された旧ブログの表示を基準に記事は横並びのサムネイルと概要に変更。短文と記事は引き続き同一タイムラインに投稿日時順で混在。サムネイルは最初の画像を使う試作であり、代表画像の個別指定は未実装。記事の画像全体は個別ページで表示。画像のない長文にNoImage等は表示しない。</p>
+<h2>採用方針と作品の扱い（2026-11-15）</h2>
+<p>現行のサムネイル付き記事と短文を混在させる1列タイムラインを採用。ポーズは作品として扱わず、作品集の対象外とする。通常の投稿一覧・画像一覧・ポーズのテーマでは引き続き閲覧可能。試作ではポーズタグの投稿を作品集のテーマ生成と絞り込みの両方から除外する。将来の本番データでもポーズは制作補助資料として分類し、作品へ自動分類しない。数値による作品数は表示しない。</p>
 <footer>今回の試作に関する詳細な検証記録と引継ぎは、ソース一式のdocsフォルダーに収録しています。ソースと開発記録の保存先：initialK-0001/personal-chronicle。</footer></main></body></html>

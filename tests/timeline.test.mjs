@@ -8,3 +8,6 @@ test('emoji counted as visible characters and text budget spans blocks',()=>{con
 test('mixed content preserves order and escapes text',()=>{const p=post('<script>alert(1)</script>',1);assert.deepEqual(shownBlocks(p),p.blocks);assert.match(timelineHTML(p,'/?post=test'),/&lt;script&gt;/);assert.doesNotMatch(timelineHTML(p,'/?post=test'),/<script>/)});
 
 test('articles use one thumbnail and imageless articles have no placeholder',()=>{const article=post('本文',1);article.title='記事';const html=timelineHTML(article,'/?post=test');assert.match(html,/article-thumbnail/);assert.equal((html.match(/<img /g)||[]).length,1);const noImage=timelineHTML(post('あ'.repeat(141)),'/?post=test');assert.doesNotMatch(noImage,/<img|article-thumbnail|NoImage/);assert.match(noImage,/続きを読む/)});
+
+import {collectionEligible} from '../dist/timeline.js';
+test('poses remain posts but are excluded from every collection',()=>{assert.equal(collectionEligible({tags:['VRM','ポーズ']}),false);assert.equal(collectionEligible({tags:['Karen']}),true);assert.equal(collectionEligible({tags:[]}),true)});

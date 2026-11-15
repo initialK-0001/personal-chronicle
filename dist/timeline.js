@@ -15,3 +15,6 @@ export function timelineHTML(post,url,admin=false){
  const thumbnail=article&&image?`<a class="article-thumbnail" href="${esc(url)}" aria-label="${esc(post.title||'投稿全体を見る')}"><img src="${esc(image.src)}" alt="${esc(image.alt||'投稿画像')}" loading="lazy"></a>`:'';
  return `<article class="timeline-post ${article?'article-row':'short-post'} ${thumbnail?'has-thumbnail':''}" ${linked?`data-destination="${esc(url)}"`:''}>${thumbnail}<div class="entry-body">${heading}<div class="timeline-content">${body}${info.length>140?'<span aria-hidden="true">…</span>':''}</div>${info.truncated?`<a class="readmore" href="${esc(url)}">${info.images>1?'投稿全体を見る':'続きを読む'}</a>`:''}<div class="postmeta"><span>${post.tags.map(esc).join(' / ')}</span><time>${date}</time></div>${admin?`<div class="post-management"><button data-edit="${esc(post.id)}">${post.sample?'コピーして編集':'編集'}</button></div>`:''}</div></article>`;
 }
+
+// ポーズは作品集に含めない 投稿自体は保持する
+export const collectionEligible=post=>!(post.tags||[]).includes('ポーズ');
