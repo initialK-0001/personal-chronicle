@@ -1,3 +1,4 @@
+import {comments} from './comments.mjs';
 import {adminStatus} from './access.mjs';
 // Private prototype storage. Host authentication must strip client-supplied identity headers.
 const json=(data,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
@@ -21,6 +22,7 @@ export async function api(request,env){try{
  if(!env.BUCKET)return json({error:'保存先に接続できません'},503);
  const prefix='users/'+await hash(new TextEncoder().encode(user))+'/';
  if(!['GET','HEAD'].includes(request.method)&& (request.headers.get('Origin')!==url.origin||request.headers.get('X-Chronicle-Request')!=='1'))return json({error:'この画面から操作してください'},403);
+ if(path==='/api/comments')return comments(request,env,prefix);
  if(path.startsWith('/api/images/')){
   if(request.method!=='GET')return json({error:'未対応の操作です'},405);
   const imageId=path.slice('/api/images/'.length);if(!/^[a-f0-9]{64}$/.test(imageId))return json({error:'画像がありません'},404);
