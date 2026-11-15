@@ -1,4 +1,17 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Brand-new TOKYO 調査・基本設計</title><style>body{font-family:"Yu Gothic",Meiryo,sans-serif;background:#f7f5f0;color:#2b3027;margin:0;line-height:1.95}main{max-width:1000px;padding:30px 5% 80px;margin:auto}nav{position:sticky;top:0;background:#e9ecdf;padding:14px 5%;display:flex;gap:24px;border-bottom:1px solid #d1d7c4}a{color:#4e6045;text-underline-offset:4px}h1{font-family:"Yu Mincho",serif;font-weight:500;line-height:1.6}h2{font-size:25px;margin-top:65px;border-top:1px solid #d1d7c4;padding-top:25px}h3{font-size:19px;margin-top:30px}table{border-collapse:collapse;display:block;overflow:auto;font-size:13px;width:100%}td,th{padding:12px 15px;border:1px solid #d1d7c4;min-width:120px}th{background:#e9ecdf;text-align:left}code{background:#e9ecdf;padding:2px 5px;overflow-wrap:anywhere}p,li{overflow-wrap:anywhere}li{margin:8px 0}strong{color:#46533d}footer{border-top:1px solid #d1d7c4;margin-top:40px;padding-top:20px;font-size:13px}@media print{nav{display:none}main{max-width:none;padding:0}h2{break-after:avoid}table{display:table;font-size:10px}td,th{min-width:0;padding:6px}}</style></head><body><nav><a href="/admin">管理画面へ戻る</a><a href="PHASE0.md" download>設計書を保存</a><a href="source.zip" download>ソース一式を保存</a></nav><main><h1>Brand-new TOKYO 第0段階：現状調査・基本設計</h1>
+<h2>現在の公開・下書き仕様（2026-11-15）</h2>
+<p>この節が現在の実装です。以下に残る「公開機能未実装」「公開見本のみ」「全APIが管理者専用」という記録は、今回の変更前の履歴です。</p>
+<ul>
+<li><code>draft</code> は非公開の編集中内容、<code>posts</code> は最後に確定した内容として独立保持。自動保存で公開版を変更しません。</li>
+<li>エディタの「公開」「公開内容を更新」でのみ公開版を確定。「非公開にする」は一覧と記事ページから操作でき、本文・日時・編集中の下書きを削除せず保持します。再公開でもIDと初回日時を維持します。</li>
+<li>従来の保存済み投稿は公開状態未指定のため非公開扱い。自動移行・自動公開しません。公開画面の見本表示は終了し、見本は管理画面に残します。</li>
+<li><code>/api/public/posts</code> は <code>visibility=public</code> の確定内容を許可項目だけに限定して返します。下書き、管理情報、未承認コメントは含みません。検索・テーマ・作品集・記事ページはこのデータだけを使います。</li>
+<li><code>/api/public/images/:hash</code> は現在の公開版による参照を毎回確認します。下書きだけの画像、非公開化後に他の公開投稿からも参照されない画像は404。取得済みデータを第三者の端末から回収する機能ではありません。</li>
+<li>公開APIと公開画像は <code>Cache-Control: no-store</code>。管理API・画像原本は管理者認証が必要です。公開側は読み取り専用で変更操作は拒否します。</li>
+<li>R2の同一stateスナップショットを条件付き更新し、本文の公開状態と画像配信の可否を一致させます。<code>public-owner.json</code> は公開元の管理領域を指すサーバー内部情報で、公開レスポンスに含めません。復元時には管理領域を戻した後、この参照も復元するか管理者が明示的に再公開します。</li>
+<li>保存先は引き続き試作R2であり、本番用の独立保存・外部自動バックアップ・画像EXIF除去・SSR/SEO・一般コメント受付は未完成。下書きの同時保持は従来どおり1件です。</li>
+<li>Sites自体は本人専用のまま。サイトを誰でも閲覧できる状態への変更、WordPress変更、DNS切替は実施していません。</li>
+</ul>
 <p>調査日：2026年11月15日（日本時間）<br>状態：<strong>UI方向性は承認済み。本格機能開発・移行・本番変更は未実施。</strong></p>
 <h2>0. 結論と今回の成果</h2>
 <p>「一つの投稿＝順序付きの画像と文章」を基本単位とする。最初に画像投稿・記事投稿などの形式を選ばせない。タイトルは空欄を許し、画像だけなら画像を、短文だけなら本文を主役にする。管理画面にも公開画面にも評価指標を持ち込まない。</p>

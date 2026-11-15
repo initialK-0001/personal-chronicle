@@ -47,14 +47,14 @@ export async function api(request,env){try{
  if(input.action==='draft'){
   const p=cleanPost(input.post),prior=current.posts.find(x=>x.id===p.id)|| (current.draft?.id===p.id?current.draft:null);
   next.draft={...p,date:prior?.date||null,updatedAt:prior?.updatedAt||null,draftSavedAt:now};
- }else if(input.action==='publish'){
+ }else if(['publish','release'].includes(input.action)){
   const p=cleanPost(input.post);if(!p.blocks.some(b=>b.type==='image'||b.text?.trim()))fail('画像か本文を追加してください');
   const prior=current.posts.find(x=>x.id===p.id)||(current.draft?.id===p.id?current.draft:null);
-  const post={...p,date:prior?.date||now,updatedAt:now};next.posts=[post,...current.posts.filter(x=>x.id!==p.id)];next.draft=null;
+  const post={...p,date:prior?.date||now,updatedAt:now,visibility:input.action==='release'?'public':'private'};
+  if(input.action==='release')await env.BUCKET.put('public-owner.json',JSON.stringify({prefix}),{httpMetadata:{contentType:'application/json'}});next.posts=[post,...current.posts.filter(x=>x.id!==p.id)];next.draft=null;
  }else if(input.action==='unpublish'){
   const p=current.posts.find(x=>x.id===input.id);if(!p)fail('投稿がありません',404);
-  if(current.draft&&current.draft.id!==p.id)fail('編集中の下書きがあります',409);
-  next.draft={...p,draftSavedAt:now};next.posts=current.posts.filter(x=>x.id!==p.id);
+  next.posts=current.posts.map(x=>x.id===p.id?{...x,visibility:'private'}:x);
  }else fail('未対応の操作です');
  for(const b of (next.draft?.blocks||next.posts.find(p=>p.id===input.post?.id)?.blocks||[])){if(b.type==='image'&&b.src.startsWith('/api/')){if(!await env.BUCKET.head(prefix+'images/'+b.src.split('/').pop()))fail('画像を確認できません');}}
  next.revision=current.revision+1;const data=JSON.stringify(next);if(new TextEncoder().encode(data).length>1024*1024)fail('試作の保存容量に達しました',413);
