@@ -1,0 +1,377 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Brand-new TOKYO 調査・基本設計</title><style>body{font-family:"Yu Gothic",Meiryo,sans-serif;background:#f7f5f0;color:#2b3027;margin:0;line-height:1.95}main{max-width:1000px;padding:30px 5% 80px;margin:auto}nav{position:sticky;top:0;background:#e9ecdf;padding:14px 5%;display:flex;gap:24px;border-bottom:1px solid #d1d7c4}a{color:#4e6045;text-underline-offset:4px}h1{font-family:"Yu Mincho",serif;font-weight:500;line-height:1.6}h2{font-size:25px;margin-top:65px;border-top:1px solid #d1d7c4;padding-top:25px}h3{font-size:19px;margin-top:30px}table{border-collapse:collapse;display:block;overflow:auto;font-size:13px;width:100%}td,th{padding:12px 15px;border:1px solid #d1d7c4;min-width:120px}th{background:#e9ecdf;text-align:left}code{background:#e9ecdf;padding:2px 5px;overflow-wrap:anywhere}p,li{overflow-wrap:anywhere}li{margin:8px 0}strong{color:#46533d}footer{border-top:1px solid #d1d7c4;margin-top:40px;padding-top:20px;font-size:13px}@media print{nav{display:none}main{max-width:none;padding:0}h2{break-after:avoid}table{display:table;font-size:10px}td,th{min-width:0;padding:6px}}</style></head><body><nav><a href="index.html">← 試作品へ戻る</a><a href="PHASE0.md" download>設計書を保存</a><a href="source.zip" download>ソース一式を保存</a></nav><main><h1>Brand-new TOKYO 第0段階：現状調査・基本設計</h1>
+<p>調査日：2026年11月15日（日本時間）<br>状態：<strong>UI方向性の確認待ち。本格機能開発・移行・本番変更は未実施。</strong></p>
+<h2>0. 結論と今回の成果</h2>
+<p>「一つの投稿＝順序付きの画像と文章」を基本単位とする。最初に画像投稿・記事投稿などの形式を選ばせない。タイトルは空欄を許し、画像だけなら画像を、短文だけなら本文を主役にする。管理画面にも公開画面にも評価指標を持ち込まない。</p>
+<p>推奨は <strong>A案の展示レイアウト＋B案の集中できる投稿画面</strong>。ただし、これは採用済み仕様ではなく、操作比較後に決める設計案である。</p>
+<p>今回実装したもの：独立した本人専用の試作品、A/Bの画面切替、総合・作品・記事表示、検索、テーマ別作品集の見本、個別表示、統合ブロック編集、端末内下書き保存・復元、試作一覧への配置と再編集、下書きへの戻し、JSON書き出し、ランダム再発見。実広告・認証システム・コメントサーバー・本番DB・予約公開・外部アプリ接続は未実装。</p>
+<p>試作のデータはブラウザーのIndexedDBに保存する。端末間同期や本番用バックアップではない。見本画像は既存の公開ブログから取得した5ファイル。実際の新しい制作活動や感想を捏造しないため、見本文は試作用と表示している。</p>
+<h2>1. 既存サイトの構成調査</h2>
+<h3>確認済み</h3>
+<table>
+<thead>
+<tr>
+<th>対象</th>
+<th>観測結果</th>
+<th>意味・移行上の注意</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>トップ</td>
+<td>記事カード一覧、ページ送り（19ページ）、サイト内検索、固定ページへのリンク</td>
+<td>検索と旧ページ送りの扱いを決める。19ページから全記事数を推定しない</td>
+</tr>
+<tr>
+<td>ナビゲーション</td>
+<td>ホーム／このサイトについて／プライバシーポリシー／お問い合わせ</td>
+<td>固定ページと問い合わせ導線も移行対象</td>
+</tr>
+<tr>
+<td>公開サイトマップ</td>
+<td>207 URL、画像参照989件、URLの前後空白を除去した重複なし画像856件</td>
+<td>投稿だけの数ではない。未公開・未参照画像や添付原本は含む保証がない</td>
+</tr>
+<tr>
+<td>URL</td>
+<td><code>/vrm1-expression</code>、<code>/vrm_otegaru_poses_01</code> のようなスラッグ、<code>/category/...</code></td>
+<td>既存パスの維持を原則とし、末尾スラッシュや日本語エンコードも照合</td>
+</tr>
+<tr>
+<td>画像</td>
+<td><code>wp-content/uploads/YYYY/MM/</code>、表示側で <code>i0.wp.com</code> の画像配信を利用</td>
+<td>CDN加工画像だけを保存せず、サーバー上の原本と派生画像を確保</td>
+</tr>
+<tr>
+<td>本文</td>
+<td>見出し・目次・コード断片・画像・カテゴリ・タグ・関連記事</td>
+<td>通常文章以外のブロックを落とさない</td>
+</tr>
+<tr>
+<td>ポーズ集</td>
+<td>外部のVRMお手軽ポーズとの連動を説明するページ</td>
+<td>画像に付くリンクやパラメーター、ダウンロード、埋込を別途実動作確認</td>
+</tr>
+<tr>
+<td>表示基盤</td>
+<td>HTMLにCocoonテーマ、Jetpack関連の資産、All in One SEO、WordPress Download Managerの情報</td>
+<td>読み込まれた資産の観測。実際の全プラグイン一覧・有効化状態とは区別</td>
+</tr>
+<tr>
+<td>広告</td>
+<td>トップHTMLにAdSenseの広告枠コードあり。ポリシーにもAdSense利用の記載</td>
+<td>広告アカウントの状態や自動広告設定は未確認</td>
+</tr>
+<tr>
+<td>追加資産</td>
+<td>AmazonJS、Complianz、Contact Form 7、footnotesの資産参照も確認</td>
+<td>Amazon広告や同意管理、フォーム、脚注の実際の設定と表示は未確認。移行時の個別確認対象に追加</td>
+</tr>
+<tr>
+<td>ポリシー</td>
+<td>WordPress.com・Google Analytics・AdSense・Search Consoleの記載</td>
+<td>記載と現在の稼働状態は一致するとは限らない</td>
+</tr>
+<tr>
+<td>コメント</td>
+<td>記事にコメントフォーム・読み込み表示あり</td>
+<td>旧コメントの保存先と公開状態は管理側で照合が必要</td>
+</tr>
+<tr>
+<td>公開REST API</td>
+<td>投稿・固定ページ・画像・カテゴリ・タグの取得要求は403</td>
+<td>公開APIだけで完全移行できるとはしない。制限の解除は行っていない</td>
+</tr>
+<tr>
+<td>robots.txt</td>
+<td>wp-adminのクロール制限、サイトマップへの参照を確認</td>
+<td>本番新サイトで適切に再構成</td>
+</tr>
+<tr>
+<td>ads.txt</td>
+<td>今回の <code>/ads.txt</code> 取得は404</td>
+<td>アカウントの要対応表示を確認する。即座に広告停止・未設定と断定しない</td>
+</tr>
+</tbody></table>
+<p>URLと画像参照の全観測値は <code>public-url-inventory.json</code> に保存。これは<strong>公開側の調査台帳でありバックアップではない</strong>。</p>
+<h3>今回の権限・情報では未確認</h3>
+<ul>
+<li>WordPressの全投稿件数、下書き、非公開記事、リビジョン、カスタム投稿、添付ファイル総数・総容量。</li>
+<li>WordPress DB・uploads・テーマ・プラグイン・設定の復元可能なバックアップ。</li>
+<li>エックスサーバーの実際の契約サービス、サーバー番号、PHP/DBバージョン、SSH・cron・容量・メール送信条件。</li>
+<li>AdSenseのサイト審査状態、自動広告、広告ユニット、広告除外、同意管理、収益状況。他の広告サービスの全記事横断確認。</li>
+<li>公開サイトマップにないURL、画像切れ、古い埋込、既存301、問い合わせフォームの保存先。</li>
+</ul>
+<p>現時点で秘密情報やパスワードの提示は不要。次段階で管理画面の読み取り、WordPressのエクスポート、ファイルとDBバックアップを安全な受け渡し方法で確認する。</p>
+<h2>2. WordPress廃止・移行方法</h2>
+<h3>方針</h3>
+<p>移行の一次資料は <strong>DBダンプ＋ファイル全体＋WordPress書き出しXML（WXR）</strong>。公開ページのクロールは照合用に使う。WXRだけでは画像本体や全設定が保全できない。WordPressを残したまま別環境で移行を反復する。</p>
+<ol>
+<li><strong>原本確保</strong>：DB、wp-content/uploads、テーマ・プラグイン、設定、.htaccess、robots、サイトマップ、広告設定を取得。秘密を含むバックアップは暗号化し非公開領域に保管。ソースリポジトリに入れない。</li>
+<li><strong>復元試験</strong>：取得したバックアップから隔離環境で旧サイトを復元。ファイルのSHA-256とDBテーブル・件数を記録。バックアップが存在するだけで成功としない。</li>
+<li><strong>移行台帳</strong>：旧ID、種別、状態、元URL、タイトル、元HTML、公開/更新日時、カテゴリ、タグ、添付・リンク・コメントの対応を記録。全ステータスを扱うが、公開用には公開済みだけを出す。</li>
+<li><strong>変換</strong>：安全に変換できる段落・画像・見出し等をブロック化。変換できない旧HTMLは消さず、原文を非公開で保持し、サニタイズした「旧記事互換」表示を用意。ショートコード・スクリプトを無条件実行しない。</li>
+<li><strong>画像と添付</strong>：原本・必要な派生ファイルをコピーし、バイト数・ハッシュ・画像寸法を照合。<code>src</code>、<code>srcset</code>、リンク先、CSS背景、ダウンロードファイル、CDN URLを抽出。縮小版しかない場合は警告し、原本取得済みと扱わない。</li>
+<li><strong>URL</strong>：可能な限り元のパスをそのまま解決するルートテーブルを作成。カテゴリ、タグ、添付ページ、ページ送り、フィード、<code>?p=ID</code> 等も調査。変更時は旧URL→新URLの一段301。無関係なトップへの一括転送はしない。</li>
+<li><strong>比較</strong>：投稿状態別件数、本文の正規化後比較と原HTML保存、添付ハッシュ、公開日時・タイムゾーン、内部リンクの行先、SEOメタ情報、canonical、構造化データ、RSS、サイトマップを照合。代表記事はPCとスマートフォンで目視。</li>
+<li><strong>例外の解決</strong>：ポーズ集、WordPress Download Manager、外部埋込、問い合わせ、旧コメントは個別の機能試験。未解決例外を移行完了として隠さない。</li>
+<li><strong>切替直前</strong>：必要な短い更新停止期間と差分取得を計画。切替時点の原本と新側のスナップショットを作る。切替・停止操作はユーザーの明示承認後のみ。</li>
+<li><strong>切替・監視・戻し</strong>：DNS切替が不要なら同一ホストのルーティング切替を優先。エラー、画像欠落、コメント漏えい等を運用ログで確認。障害時は旧配信へ戻し、新側に増えた投稿やコメントを別途保持してから差分調整する。</li>
+</ol>
+<h3>移行完了の条件</h3>
+<p>全件の移行台帳が「移行済み」または説明付きの保留に分類され、未説明の欠落ゼロ。公開対象・日時が一致し、全URLが期待する200/301/410等になる。添付原本のハッシュが一致する。下書き・未承認コメント・非公開画像を匿名取得できない。バックアップから復元できる。ユーザーが代表画面と例外を確認する。</p>
+<p>旧WordPressの削除は、これらを満たした後でも別途承認が必要。切替後もしばらくは外部非公開の復旧用原本として保持する。</p>
+<h2>3. 基本画面構成とUI比較</h2>
+<table>
+<thead>
+<tr>
+<th>画面</th>
+<th>主な役割</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>トップ（総合／作品／記事）</td>
+<td>同じ投稿データを鑑賞・読書・新着の目的で切替。人気順は用意しない</td>
+</tr>
+<tr>
+<td>個別投稿</td>
+<td>大きな画像と最大約720pxの読みやすい文章。題名なしでも不要な「無題」を出さない</td>
+</tr>
+<tr>
+<td>作品集</td>
+<td>Karenなどのテーマに投稿を関連付け、自動的に集まる</td>
+</tr>
+<tr>
+<td>展示室（第2段階）</td>
+<td>投稿への参照を好きな順番で配置。元記事を複製しない</td>
+</tr>
+<tr>
+<td>投稿画面</td>
+<td>画像か文章から即開始。設定は必要なときだけ開く</td>
+</tr>
+<tr>
+<td>自分の机（管理）</td>
+<td>下書き、編集、未承認コメント、過去の作品。アクセス数や投稿達成率なし</td>
+</tr>
+<tr>
+<td>固定ページ</td>
+<td>サイトについて、プライバシー、問い合わせ等を維持</td>
+</tr>
+</tbody></table>
+<h3>A：余白の展示室</h3>
+<p>淡い生成りと苔色。画像を切り抜かず全体表示し、余白を持つグリッドで短文と作品を共存させる。PCの投稿画面は編集とプレビューの2列。完成後の見え方を見ながら飾れる。写真・VRM作品が主になる場合に向く。</p>
+<h3>B：日々のノート</h3>
+<p>生成りと褐色。トップの説明を小さくし、画像と文章が横に並ぶ落ち着いた一覧。短文も一つの記録として流れに入る。投稿画面は中央の1列で、必要なときに大きなプレビューを開く。制作の過程や長文を書きやすい。</p>
+<p>両案ともスマートフォンでは単列中心。作品画像の縦横比を維持し、文字を画像に重ねない。試作の画像は旧ブログの見本であり、今のKaren等に差し替えたときの評価は別途行う。</p>
+<h3>操作比較の順序</h3>
+<p>A/Bを切替 → 同じ作品と短文を見る → 作品/記事の切替 → タイトルなしでひとこと入力 → 画像を追加 → 順番変更 → 大きなプレビュー → 閉じて下書きを再開 → 試作の一覧に置く。</p>
+<p>UI判断で確認する点は「何も考えず一枚置けるか」「過去作を眺めたくなるか」「長文も書きたくなるか」。評価数・達成数は使わない。</p>
+<h2>4. 統合投稿・表示方式</h2>
+<h3>内容のモデル</h3>
+<p><code>Post</code> は <code>id</code>, <code>title: null|string</code>, <code>status</code>, <code>published_at</code>, <code>updated_at</code>, <code>revision_id</code> を持つ。内容は順序付き <code>blocks[]</code>。基本型は paragraph / heading / image / quote / link、後に gallery / comparison / legacy_html を追加する。</p>
+<p>画像ブロックは画像ID、代替テキスト、説明、表示比率の希望を持つ。本文を生HTMLとして受け取り、そのまま実行する方式にはしない。見出し階層やリンクの装飾は構造化リッチテキストとして扱う。試作は各ブロックにテキストを入力する簡易版で、インラインの太字・リンク指定等は第1段階の編集ライブラリで扱う。</p>
+<h3>自動表示の規則（提案）</h3>
+<ul>
+<li>画像あり・文章少量：画像主体。1枚なら全体表示、複数なら2枚程度の組写真と詳細への導線。</li>
+<li>画像なし・短文：本文そのものを表示。空のタイトル領域を作らない。</li>
+<li>長文／複数見出し：題名があれば題名、なければ冒頭文をリンクのアクセシブル名に使い、概要を短く表示。</li>
+<li>作品表示：画像を持つ投稿を抽出。記事表示：意味のある本文を持つ投稿を抽出。双方に同じ投稿が出てよい。</li>
+<li>自動判定が意図と違う場合だけ「代表画像」「概要」「見せ方」を任意設定。形式選択を投稿の入口にしない。</li>
+<li>順序は原則公開日時。更新では自動的に先頭へ浮上させず、更新日を別に持つ。</li>
+</ul>
+<p>試作品は画像の有無・枚数と本文の有無で分類し、本文を短く表示する簡易規則。最初の画像投稿を大きく見せる固定のレイアウトがあり、本番の最終自動レイアウトではない。</p>
+<h3>保存・公開</h3>
+<p>本番は下書きの自動保存、画像アップロード、公開処理を分離。未完了のアップロード中は公開を完了できない。改訂版は非公開で編集し、明示的な「公開内容を更新」で公開版ポインタを差し替える。保存は改訂番号による競合検出を行い、別端末の内容を黙って上書きしない。</p>
+<p>状態は draft / scheduled / published / private / archived。予約は明示指定された時刻にだけ公開。時刻はDBではUTC、UIでは日本時間を基本とする。公開版と編集中の下書き版を区別し、公開済みページの編集途中が漏れないようにする。</p>
+<h2>5. DB・画像・認証・広告の基本構成</h2>
+<h3>技術構成の提案（契約確認前の条件付き）</h3>
+<p>第一候補は <strong>エックスサーバー上のPHP＋MySQL互換DB＋独立した画像保管</strong>。公開ページはサーバー側でHTMLを出し、管理エディタだけをTypeScriptで構築する。PHPの認証・セッション・入力検証は保守されているフレームワークに委ね、自作認証を避ける。Laravel等の適用可否は実契約のPHP/拡張/配備条件を確認して確定する。ビルドは開発環境で行い、本番にNode常駐を要求しない構成を優先する。</p>
+<p>公式資料ではPHP8系、MySQL/MariaDB、cronが提供されるが、バージョンやバックアップ条件はサーバーによって異なる。ユーザー契約の機能を確認したとは扱わない。利用できなければ、別の汎用ホスト＋同じSQL/ファイル形式を第二候補とする。Sites専用のD1/R2を本番データの唯一の保存先にする案は採らない。</p>
+<table>
+<thead>
+<tr>
+<th>領域</th>
+<th>提案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>開発</td>
+<td>今回は私用Sitesで静的試作。次に同じ構造のテストDB・画像領域を用意</td>
+</tr>
+<tr>
+<td>公開</td>
+<td>公開済み改訂だけをHTML/API/検索/RSS/サイトマップに出力</td>
+</tr>
+<tr>
+<td>管理</td>
+<td>別の管理経路。認証・権限検証を全操作で実施。表示を隠すだけにはしない</td>
+</tr>
+<tr>
+<td>DB</td>
+<td>posts、post_revisions、assets、post_assets、topics、post_topics、collections、collection_items、comments、legacy_routes、import_jobs、audit_events、admin_users、sessions</td>
+</tr>
+<tr>
+<td>画像</td>
+<td>原本は公開ディレクトリ外。公開承認されたものだけ派生画像を配信。公開取消時は配信権限とキャッシュも無効化</td>
+</tr>
+<tr>
+<td>バックアップ</td>
+<td>SQL＋原本＋メタデータJSON＋ハッシュ台帳。暗号化した別の保存先にもコピー。復元訓練を実施</td>
+</tr>
+<tr>
+<td>検索</td>
+<td>初期はSQLで題名・本文・テーマを検索。外部検索サービス依存は初期に増やさない</td>
+</tr>
+</tbody></table>
+<p><code>assets</code> はSHA-256、MIME、バイト数、幅高、保管キー、公開状態、派生元、代替テキストを持つ。<code>legacy_routes</code> は元URL/旧ID→新IDの一意対応。<code>comments</code> はpending/approved/rejected/spam/deleted、親コメント、公開可能な名前と本文、非公開の連絡先・不正対策情報を分離する。評価の数値を投稿スキーマに作らない。</p>
+<h3>セキュリティとコメント</h3>
+<ul>
+<li>管理者登録は一般公開しない。パスワードの安全なハッシュ、TOTP等の追加認証、回復手段、試行回数制限を用意。</li>
+<li>セッションはサーバー側で失効可能にし、Secure/HttpOnly/SameSite Cookie、CSRF防御、ログイン時ID再生成、期限・ログアウトを適用。</li>
+<li>コメントPOSTは必ずpendingで保存。投稿者がapprovedを送っても無視。匿名GETはapprovedかつ公開済み投稿のものだけ。未承認内容・連絡先はレスポンス、HTML、ログ出力、検索インデックスに入れない。</li>
+<li>IP等に基づく有効期限付き頻度制限、ハニーポット、長さ・URL数制限、サニタイズを段階導入。必要になった場合だけ追加のボット対策を検討。</li>
+<li>管理画面は承認・却下・スパム・保持型削除・任意返信。コメント数のバッジや人気比較は表示しない。</li>
+<li>アップロードは拡張子だけでなく実データの形式・寸法・容量を検証。画像再エンコードでEXIF位置情報等を公開派生画像から除去。SVG/HTMLは初期の画像アップロード対象にしない。</li>
+<li>添付を推測しにくいURLにするだけでは非公開保護としない。下書き画像は認証を必要にし、バックアップ・旧HTML・エクスポートは公開領域外に置く。</li>
+<li>外部画像取込は初期無効。将来追加時はSSRF、転送先、ローカルIP、容量の制限を実施。</li>
+<li>依存の固定、脆弱性点検、更新手順、秘密情報の環境設定、DB最小権限、障害ログの個人情報削減を運用に含める。</li>
+</ul>
+<h3>広告・プライバシー</h3>
+<p>AdSenseを継続する前提で、長文の本文後・関連記事前、トップの投稿群の区切り等を候補とする。画像への重なり、鑑賞中の割込み、管理・下書きプレビューへの広告は禁止。広告枠の高さを予約し、レイアウト移動を抑える。作品詳細は作品と説明を読み終えた後の位置を基本とする。</p>
+<p>収益維持は保証できない。既存ユニット・自動広告・除外領域を確認して継承し、広告停止や設定全廃を独断で行わない。収益やアクセスの数字をサイトの投稿管理画面に表示しない。</p>
+<p>Googleの最新公式案内に従い、EEA・英国・スイスの対象配信では認定CMPなどの要件を確認する。広告、アクセス解析、コメント連絡先、IP等の不正対策情報の目的・保持期間・削除窓口を実運用に合わせてポリシーへ反映する。試作では広告リクエスト・アクセス解析を実行しない。法的な適用判断や広告アカウントの適合性を確認済みとはしない。</p>
+<h2>6. パーソナルプラットフォーム・関連アプリ連携</h2>
+<p>2026-11-15に各GitHub READMEを読み取り。READMEと本番が一致する保証はない。共通の公開用APIが利用可能であることは今回確認できていない。</p>
+<table>
+<thead>
+<tr>
+<th>アプリ</th>
+<th>リポジトリで確認した現状</th>
+<th>初期の接続案</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Personal Web Platform</td>
+<td>ブラウザー内の個人アーカイブ、索引JSON入出力、WXR取込（合成XMLの検証まで）。公開アメブロ取得中継APIは対象ホスト限定、原本保管APIではない</td>
+<td>選択した記録と添付をエクスポートし、新サイトの非公開下書きへ取り込む</td>
+</tr>
+<tr>
+<td>VRMビューア</td>
+<td>PNG/動画の端末保存、ポーズや設定の保存API。モデル本体の自動保管はしない</td>
+<td>まず撮影PNGを手動添付。後に明示的な「投稿の下書きへ」で画像と撮影メタ情報だけ送る</td>
+</tr>
+<tr>
+<td>ドライブ探索地図</td>
+<td>READMEはデモ地点、お気に入り・個人メモのブラウザー保存を記載</td>
+<td>訪問の事実を証明するAPIは未確認。お気に入りを訪問済みと誤認しない。選択情報の下書き化から開始</td>
+</tr>
+<tr>
+<td>Playlist Manager</td>
+<td>プレイリストのJSON入出力と公開YouTube参照</td>
+<td>選択URLと本人のメモを渡す。音源・動画の複製公開はしない</td>
+</tr>
+<tr>
+<td>Web Master</td>
+<td>利用者別の保存、JSON、共有入口、RSS等</td>
+<td>選択URL・出典・本人の文章を渡す。ブックマーク先の本文を無断転載しない</td>
+</tr>
+</tbody></table>
+<h3>連携契約の提案</h3>
+<p>ファイル交換を第1の経路とし、APIは各アプリの実コード・認証方式を確認後に追加する。<code>schema_version</code>, <code>source_app</code>, <code>source_record_id</code>, <code>source_revision</code>, <code>captured_at</code>, <code>blocks</code>, <code>assets</code>, <code>provenance</code> を持つ受け渡し形式を定義する。これらの技術情報は編集者の画面には通常出さない。</p>
+<ol>
+<li>元アプリで本人が公開候補を選ぶ。</li>
+<li>必要な項目だけを非公開の取込領域へ渡す。個人メモ・位置・連絡先等は既定で除外。</li>
+<li>重複防止キーと出典IDで同じ取込の多重生成を防ぐ。</li>
+<li>画像の公開権・EXIF・本文・出典・公開予定範囲をプレビュー。</li>
+<li>本人が新サイトで公開を明示したときのみ公開版へ反映。</li>
+</ol>
+<p>APIクライアントに <code>draft:create</code> 相当の権限だけを与え、<code>publish</code> を与えない。非公開基盤のDBを公開側から直接参照しない。元データの後日の変更を公開記事へ自動反映しない。</p>
+<p>AI提案は第3段階。事実と出典を保持し、本人の体験や感想を補って創作しない。生成文はすべて下書き扱いで、AIによる公開操作は用意しない。</p>
+<h2>7. 第1段階の実装計画と優先順位</h2>
+<table>
+<thead>
+<tr>
+<th>優先</th>
+<th>作業</th>
+<th>完了条件</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>P0</td>
+<td>UI方向性確認と契約実態確認</td>
+<td>A/B/組合せを決定。サーバー機能と配備先を確認</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>DB・原本保管・認証・公開分離</td>
+<td>匿名から管理/下書き/画像を取得できない。復元可能なバックアップが取れる</td>
+</tr>
+<tr>
+<td>P0</td>
+<td>投稿の最小往復</td>
+<td>画像1枚・短文をタイトルなしで保存→復元→プレビュー→明示公開→非公開化</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>長文と複数画像</td>
+<td>見出し・引用・リンク・並べ替え・画像説明・スマートフォン操作が自然</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>改訂・自動保存・日時</td>
+<td>競合を検出。公開版を残して下書き編集。日本時間の予約と取消が正しい</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>公開表示・検索・個別URL</td>
+<td>総合/作品/記事、SEOメタ情報、RSS/サイトマップに公開データのみ出る</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>承認制コメント</td>
+<td>pendingが全匿名経路で不可視。制限・承認・却下・返信・削除を確認</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>広告・固定ページ</td>
+<td>本番設定を確認し、作品を妨げない位置で配信。同意要件を満たす</td>
+</tr>
+<tr>
+<td>P1</td>
+<td>移行リハーサル</td>
+<td>全移行台帳・画像・本文・URL・日時・例外を照合。旧サイトは維持</td>
+</tr>
+<tr>
+<td>最後</td>
+<td>本番切替の承認</td>
+<td>バックアップ・復元・戻し手順と検証結果を提示してから切替</td>
+</tr>
+</tbody></table>
+<p>第2段階：自動作品集の本実装、新旧比較スライダー、自由な展示順、改訂履歴閲覧、過去作再発見。第3段階：受け渡しAPI、外部アプリ、AI候補。初期にすべてを同時実装しない。</p>
+<h3>本番検証の重点</h3>
+<p>認証・認可の否定系、未承認コメントのAPI/検索漏えい、非公開化後の画像とキャッシュ、CSRF/XSS/アップロード、予約時刻、二重公開、複数端末競合、通信断からの復帰、画像取込失敗、バックアップ復元。PC・iPhone・Android・タブレットの実機操作は機能実装段階で確認する。</p>
+<h2>8. 開発記録と再開</h2>
+<ul>
+<li><code>README.md</code>：現在の状態と実行方法。</li>
+<li><code>docs/PHASE0.md</code>：本書。提案と確認済み事実を分離。</li>
+<li><code>docs/public-url-inventory.json</code>：公開側調査台帳。</li>
+<li><code>docs/VERIFICATION.md</code>：試作品の検証と未確認範囲。</li>
+<li><code>docs/STATUS.md</code>：実装済み／未実装／次に行うこと。</li>
+<li><code>dist/</code>：試作品の静的ソース。</li>
+</ul>
+<p>本番の非公開データ、アップロードされた試作データ、認証情報はGitに入れない。初回成果の保全とGitHubへの反映状態はSTATUSで明示する。Gitへの保存と本番反映は別の操作として扱う。</p>
+<h2>参考資料</h2>
+<p>すべて2026-11-15確認。公開サイトの観測結果は現在時点のものである。</p>
+<ul>
+<li>既存トップ：<a href="https://brand-new.tokyo/">https://brand-new.tokyo/</a></li>
+<li>サイトマップ：<a href="https://brand-new.tokyo/sitemap.xml">https://brand-new.tokyo/sitemap.xml</a></li>
+<li>プライバシーポリシー：<a href="https://brand-new.tokyo/privacy-policy">https://brand-new.tokyo/privacy-policy</a></li>
+<li>旧記事例：<a href="https://brand-new.tokyo/vrm1-expression">https://brand-new.tokyo/vrm1-expression</a></li>
+<li>ポーズ集：<a href="https://brand-new.tokyo/vrm_otegaru_poses_01">https://brand-new.tokyo/vrm_otegaru_poses_01</a></li>
+<li>WordPress公式バックアップ：<a href="https://developer.wordpress.org/advanced-administration/security/backup/">https://developer.wordpress.org/advanced-administration/security/backup/</a></li>
+<li>エックスサーバー言語・コマンド：<a href="https://www.xserver.ne.jp/manual/man_program_soft.php">https://www.xserver.ne.jp/manual/man_program_soft.php</a></li>
+<li>エックスサーバーDB仕様：<a href="https://www.xserver.ne.jp/support/faq/service_db_version.php">https://www.xserver.ne.jp/support/faq/service_db_version.php</a></li>
+<li>エックスサーバーcron：<a href="https://www.xserver.ne.jp/manual/man_program_cron.php">https://www.xserver.ne.jp/manual/man_program_cron.php</a></li>
+<li>エックスサーバーバックアップ：<a href="https://www.xserver.ne.jp/functions/service_backup.php">https://www.xserver.ne.jp/functions/service_backup.php</a></li>
+<li>Google AdSense同意管理：<a href="https://support.google.com/adsense/answer/13554116?hl=ja">https://support.google.com/adsense/answer/13554116?hl=ja</a></li>
+<li>連携資料：initialK-0001 配下の personal-web-platform / vrm-viewer / drive-explorer-map / youtube-playlist-manager / web-master のREADME、および personal-web-platform/sites/personal-archive/README.md。</li>
+</ul>
+<footer>今回の試作に関する詳細な検証記録と引継ぎは、ソース一式のdocsフォルダーに収録しています。ソースと開発記録の保存先：initialK-0001/personal-chronicle。</footer></main></body></html>
