@@ -16,3 +16,7 @@ migration-private/
 *.sql.gz
 *.sqlite
 __pycache__/
+
+# Independent runtime secrets and persistent data
+xserver/config.json
+xserver/var/
