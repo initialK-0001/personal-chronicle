@@ -3,9 +3,9 @@
 import http.cookiejar,json,os,pathlib,socket,subprocess,tempfile,time,urllib.request,urllib.error
 root=pathlib.Path(__file__).resolve().parents[1];php=os.environ.get('PHP_BIN','php')
 with tempfile.TemporaryDirectory() as tmp:
- p=pathlib.Path(tmp);(p/'sessions').mkdir();sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close();origin=f'http://127.0.0.1:{port}'
+ p=pathlib.Path(tmp);(p/'sessions').mkdir();(p/'images').mkdir();sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close();origin=f'http://127.0.0.1:{port}'
  password='test-'+os.urandom(16).hex();h=subprocess.check_output([php,'-r','echo password_hash(stream_get_contents(STDIN),PASSWORD_DEFAULT);'],input=password.encode()).decode()
- cfg={'dsn':'sqlite:'+str(p/'db.sqlite'),'origin':origin,'password_hash':h,'rate_secret':os.urandom(32).hex(),'sessions':str(p/'sessions')}
+ cfg={'dsn':'sqlite:'+str(p/'db.sqlite'),'origin':origin,'password_hash':h,'rate_secret':os.urandom(32).hex(),'sessions':str(p/'sessions'),'images':str(p/'images')}
  (p/'config.json').write_text(json.dumps(dict(cfg,local_test=True)))
  env=dict(os.environ,CHRONICLE_CONFIG=str(p/'config.json'));subprocess.run([php,str(root/'bin/setup.php')],env=env,check=True)
  server=subprocess.Popen([php,'-S',f'127.0.0.1:{port}','-t',str(root/'public'),str(root/'public/index.php')],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -41,6 +41,23 @@ with tempfile.TemporaryDirectory() as tmp:
   assert call(a,f'/api/admin/posts/{id}',{'action':'release','revision':2},token)[0]==409
   assert call(b,f'/api/admin/posts/{id}',{'action':'unpublish','revision':3},t)[0]==200
   assert call(anon,'/api/public/posts')[1]['posts']==[]
+  # Real decode/re-encode and public-reference authorization
+  import base64
+  png=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1kAAAAASUVORK5CYII=')
+  # Produce a valid image with GD, independent of the upload implementation
+  png=subprocess.check_output([php,'-r','$i=imagecreatetruecolor(2,2);imagepng($i);'])
+  req=urllib.request.Request(origin+'/api/upload',data=png,headers={'Origin':origin,'X-CSRF-Token':token,'Content-Type':'image/png'})
+  uploaded=json.loads(a.open(req).read());src=uploaded['src'];public=src.replace('/api/images/','/api/public/images/')
+  assert call(anon,public)[0]==404
+  imagepost={'title':'','tags':[],'blocks':[{'id':'image','type':'image','src':src,'alt':''}]}
+  status,data,_=call(a,'/api/admin/posts',imagepost,token);assert status==201;imageid=data['post']['id']
+  assert call(a,f'/api/admin/posts/{imageid}',{'action':'release','revision':1},token)[0]==200
+  assert anon.open(origin+public).headers['Content-Type']=='image/png'
+  assert call(a,f'/api/admin/posts/{imageid}',{'action':'unpublish','revision':2},token)[0]==200
+  assert call(anon,public)[0]==404
+  try:anon.open(origin+src);raise AssertionError('private image exposed')
+  except urllib.error.HTTPError as e:assert e.code==401
+  assert call(a,'/api/state')[1]['state']['posts']
   assert call(a,'/api/logout',{},token)[0]==200
   assert call(a,f'/api/admin/posts/{id}')[0]==401
   t=call(anon,'/api/session')[1]['csrf']

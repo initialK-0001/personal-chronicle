@@ -1,0 +1,53 @@
+<?php
+declare(strict_types=1);
+namespace Chronicle;
+require_once __DIR__.'/../vendor/autoload.php';
+final class Legacy {
+    private Store $store;private bool $enabled;
+    public function __construct(Store $store,bool $enabled){$this->store=$store;$this->enabled=$enabled;}
+    public function records():array{
+        if(!$this->enabled)return [];
+        $out=[];foreach($this->store->db->query("SELECT original_json FROM chronicle_imports WHERE original_status='publish'")->fetchAll() as $row){$r=json_decode($row['original_json'],true,512,JSON_THROW_ON_ERROR);if(($r['original_record']['post_password']??'')==='')$out[]=$r;}return $out;
+    }
+    public function find(string $path):?array{foreach($this->records() as $r)if(rtrim(rawurldecode($r['path']),'/')===rtrim(rawurldecode($path),'/'))return $r;return null;}
+    public function html(string $raw):string{
+        $raw=preg_replace_callback('/\[blogcard\s+([^\]]+)\]/i',function($m){preg_match('/url=["\']([^"\']+)["\']/',$m[1],$a);return isset($a[1])?'<p><a href="'.htmlspecialchars($a[1],ENT_QUOTES).'">'.htmlspecialchars($a[1]).'</a></p>':htmlspecialchars($m[0]);},$raw);
+        $raw=preg_replace_callback('/\[amazonjs\s+([^\]]+)\]/i',function($m){preg_match('/asin=["\']([A-Z0-9]{10})["\']/i',$m[1],$a);preg_match('/title=["\']([^"\']+)["\']/',$m[1],$t);return isset($a[1])?'<p><a href="https://www.amazon.co.jp/dp/'.$a[1].'">'.htmlspecialchars($t[1]??'Amazonで商品を見る').'</a></p>':htmlspecialchars($m[0]);},$raw);
+        $raw=preg_replace_callback('/\[wpdm_package\s+([^\]]+)\]/i',function($m){preg_match('/id=["\']?(\d+)/',$m[1],$a);return isset($a[1])?'<p><a href="/?wpdmdl='.$a[1].'">ファイルをダウンロード</a></p>':htmlspecialchars($m[0]);},$raw);
+        $raw=preg_replace('/\[\/?caption\b[^\]]*\]/i','',$raw);
+        $raw=preg_replace('/\[contact-form-7\b[^\]]*\]/i','<p>お問い合わせフォームは移行準備中です</p>',$raw);
+        $config=\HTMLPurifier_Config::createDefault();$config->set('Cache.DefinitionImpl',null);$config->set('HTML.Allowed','p,br,div,span,h1,h2,h3,h4,h5,h6,blockquote,pre,code,ul,ol,li,strong,b,em,i,u,s,del,table,thead,tbody,tr,th[colspan|rowspan],td[colspan|rowspan],a[href|title],img[src|alt|width|height],hr,sub,sup');$config->set('URI.AllowedSchemes',['http'=>true,'https'=>true,'mailto'=>true]);
+        return (new \HTMLPurifier($config))->purify($raw);
+    }
+    public function posts():array{
+        $out=[];foreach($this->records() as $r){if($r['type']!=='post')continue;$html=$this->html($r['original_html']);$blocks=[];
+            $thumb=$r['thumbnail']??null;
+            if(!$thumb&&preg_match('/<img[^>]+src="([^"]+)"/',$html,$m))$thumb=html_entity_decode($m[1],ENT_QUOTES,'UTF-8');
+            if($thumb)$blocks[]=['type'=>'image','src'=>$thumb,'alt'=>''];
+            $blocks[]=['type'=>'paragraph','text'=>html_entity_decode(strip_tags($html),ENT_QUOTES,'UTF-8')];
+            $out[]=['id'=>'legacy-'.$r['legacy_id'],'url'=>$r['path'],'title'=>$r['title'],'tags'=>array_values(array_map(fn($t)=>$t['name'],$r['terms'])),'date'=>$r['published_at'],'updatedAt'=>$r['updated_at'],'blocks'=>$blocks];
+        }return $out;
+    }
+    public function media(string $path,string $uploads):void{
+        $path=rawurldecode($path);$prefix='/wp-content/uploads/';$allowed=false;
+        foreach($this->records() as $r){if(($r['thumbnail']??'')===$path)$allowed=true;
+            if(preg_match('~'.preg_quote($path,'~').'(?=[?"\'<>\s,)\]])~u',html_entity_decode(rawurldecode($r['original_html']),ENT_QUOTES,'UTF-8')))$allowed=true;
+        }
+        $root=realpath($uploads);$file=$root?realpath($root.'/'.substr($path,strlen($prefix))):false;
+        if(!$allowed||!$file||!$root||!str_starts_with($file,$root.'/')||!is_file($file))throw new Failure('画像がありません',404);
+        $info=@getimagesize($file);if(!$info||!in_array($info[2],[IMAGETYPE_PNG,IMAGETYPE_JPEG,IMAGETYPE_GIF,IMAGETYPE_WEBP],true))throw new Failure('画像がありません',404);
+        header('Content-Type: '.$info['mime']);readfile($file);exit;
+    }
+    public function download(int $id,string $uploads):void{
+        $referenced=false;foreach($this->records() as $r)if(preg_match('/\[wpdm_package\s+[^\]]*id=["\']?'.preg_quote((string)$id,'/').'(?=["\'\s\]])/',$r['original_html']))$referenced=true;
+        $q=$this->store->db->prepare('SELECT data_json FROM chronicle_downloads WHERE legacy_id=?');$q->execute([$id]);$raw=$q->fetchColumn();$d=$raw?json_decode($raw,true):null;
+        if(!$referenced||!($d['public']??false)||count($d['files'])!==1)throw new Failure('ファイルがありません',404);
+        $name=$d['files'][0];$root=realpath($uploads.'/download-manager-files');$file=$root?realpath($root.'/'.$name):false;
+        if(!$root||!$file||!str_starts_with($file,$root.'/')||!is_file($file))throw new Failure('ファイルがありません',404);
+        header('Content-Type: application/octet-stream');header("Content-Disposition: attachment; filename*=UTF-8''".rawurlencode(basename($file)));readfile($file);exit;
+    }
+    public function page(array $r):string{
+        $e=fn($v)=>htmlspecialchars($v??'',ENT_QUOTES,'UTF-8');
+        return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'.$e($r['title']).' | Brand-new TOKYO</title><link rel="stylesheet" href="/style.css"></head><body><div class="masthead"><header><a class="brand" href="/">Brand-new TOKYO</a></header></div><main class="legacy-article"><h1>'.$e($r['title']).'</h1><time>'.$e(substr($r['published_at']??'',0,10)).'</time><div class="rendered">'.$this->html($r['original_html']).'</div><a href="/">一覧へ戻る</a></main></body></html>';
+    }
+}

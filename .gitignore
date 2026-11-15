@@ -20,3 +20,5 @@ __pycache__/
 # Independent runtime secrets and persistent data
 xserver/config.json
 xserver/var/
+
+xserver/vendor/

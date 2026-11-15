@@ -1,6 +1,6 @@
 # エックスサーバー向け保存基盤
 
-2026-11-16の実装。`xserver/` は独立したPHP APIとCLI取込処理。**開発環境で検証済み、本番未配備、現行画面との接続は未完了。** Sites版の保存先や既存WordPressは変更していない。
+2026-11-16の実装。`xserver/` は独立したPHP APIとCLI取込処理。**開発環境で検証済み、本番未配備、投稿画面との接続済み ブラウザー通し操作は未検証。** Sites版の保存先や既存WordPressは変更していない。
 
 ## 実装済み
 
@@ -34,7 +34,7 @@ CLIのみで `php xserver/bin/setup.php` を実行して専用DBにテーブル�
 | POST /api/admin/posts/:id | revisionとaction（draft/release/unpublish）を指定 contentは必要時のみ |
 | GET /api/public/posts | 公開済みスナップショットのみ |
 
-変更リクエストはJSON、同一Origin、`X-CSRF-Token` が必要。管理APIはセッション認証を要求。Sites版の `/api/state` とは異なる契約であり、画面をそのまま接続できると扱わない。
+変更リクエストはJSON、同一Origin、`X-CSRF-Token` が必要。管理APIはセッション認証を要求。`/api/state` の互換経路を追加し PHP専用画面へ接続済み 投稿ごとの改訂番号で競合を検出する。
 
 ## 旧記事取込
 
@@ -57,8 +57,8 @@ HTTP試験は一時ディレクトリ・乱数のテスト認証情報・ロー�
 
 ## 本番切替前に残る作業
 
-1. 管理画面接続、画像アップロード・再エンコード・非公開配信制御。現APIは文章・見出し・引用・リンクまでで、画像ブロックを未対応として拒否する。
-2. 旧HTMLの安全な表示・ショートコード・添付リンクと既存URLの解決。ステージング原文をそのまま公開しない。
+1. 実ブラウザーでの投稿から再編集までの通し確認 画像のEXIF回転補正 大容量時のメモリー確認。
+2. 旧記事全件の表示差分確認 Amazonアフィリエイト識別子の維持 旧記事の編集 お問い合わせフォーム対応。
 3. 一般コメント、広告、固定ページ、検索・SEO、一覧のページ分割。
 4. 実ホストPHP/DB/セッション・HTTPSでの検証、管理者認証設定、追加認証と復旧経路の確認。自作のアプリ認証層は本番前に再レビューする。
 5. 独立した全ファイルバックアップと復元試験、具体的な切替・戻し手順、利用者による切替承認。
@@ -66,3 +66,19 @@ HTTP試験は一時ディレクトリ・乱数のテスト認証情報・ロー�
 PHP標準機能を使った小規模な実装として検証を始めた段階であり、設計時に候補としたLaravel等の認証基盤を採用済みとはしない。
 
 参考（2026-11-16確認）：PHP公式の[セッション管理](https://www.php.net/manual/ja/features.session.security.management.php)、[PDOトランザクション](https://www.php.net/manual/ja/pdo.transactions.php)。
+
+## 追加実装 2026-11-16
+
+- `scripts/build-xserver-ui.py` が承認済みUIからPHP用画面を生成する Sitesの試作画面は変更しない。ログイン・新規投稿・複数下書き・保存・公開更新・非公開化・ログアウトをPHPへ接続。試作用サンプルは含めない。
+- JPEG/PNG/WebPは8MiB・1600万画素まで GDでPNG再生成しメタデータを除去。画像は `images` で指定する公開領域外へ保存。公開スナップショットが参照する画像だけ匿名配信。EXIFの向き補正は未実装。
+- 旧記事表示は `legacy_public_enabled` が厳密にtrueの場合だけ有効 初期値false。元から公開されパスワードのない記事・固定ページのみ 元URLでサーバー側HTML表示。下書きと非公開記事は対象外。HTMLPurifierでスクリプトと危険な属性を除去。
+- blogcardはリンク amazonjsは商品リンク wpdm_packageは配布リンクへ変換。Amazonの広告識別子はまだ復元していない。contact-form-7は準備中の表示。未対応埋め込みを完全互換とは扱わない。
+- `legacy_uploads` はバックアップから分離した旧uploadsを指定し 公開記事に参照のある画像と公開設定済みの単一配布ファイルだけ返す。public配下に旧uploadsを直接置かない。管理者の旧記事プレビューは本文のみ対応し 非公開段階の旧画像プレビューは未対応。
+- `php xserver/tests/legacy.php` で公開状態・パスワード記事除外・HTML無害化・短縮コード変換を確認。HTTPテストは画像の公開前404・公開後200・非公開後404まで確認。PHP8.4で実施し MySQLは未検証。
+- 依存導入は xserver 内で `composer install --no-dev` ロックファイルを使用。2026-11-16のComposer監査で既知の脆弱性情報なし。
+
+## 配備パッケージ
+
+`python3 scripts/package-xserver.py /private/chronicle-code.zip` で依存を含むコードのみ梱包。設定・DB・移行JSONは含めない。`php xserver/bin/preflight.php` は書込みや取込みをせず環境を確認する。
+
+配備時は本体のsrc/ui/vendor/binを公開領域外に置き public/index.phpの参照先をその配置に合わせる。現在の相対配置は public をドキュメントルートにできる独立環境向けであり 既存public_htmlへそのまま全体を展開してはいけない。本番配置パスを確定してから入口ファイルを生成する。旧WordPressの停止・PHP変更・切替は未実施。
