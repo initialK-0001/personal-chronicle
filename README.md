@@ -6,7 +6,7 @@
 - `docs/STATUS.md`：現状と再開点。
 - `docs/VERIFICATION.md`：検証記録。
 - `docs/public-url-inventory.json`：サイトマップ由来のURL・画像参照台帳。完全バックアップではありません。
-- `dist/index.html`：A/B比較試作品。`dist/report.html`：設計資料の閲覧版。
+- `dist/index.html`：カタログ型UI試作品。`dist/report.html`：設計資料の閲覧版。
 
 ## 動かす
 
@@ -27,3 +27,7 @@ GitHub: https://github.com/initialK-0001/personal-chronicle
 今回のソース、設計、検証記録、公開ブログ由来の見本画像をこのリポジトリに記録します。入力した下書き・非公開画像・認証情報は含みません。配信先固有の設定はGitHubには含めず、汎用HTTPホストで `dist` を配信すれば試作を復元できます。サイト固有の配備設定は開発環境側で管理します。
 
 資料を再生成する場合は `scripts/render-report.mjs` を使います（Node.jsとmarkedが必要）。通常の表示は生成済みHTMLで動作し、追加依存は不要です。`python3 scripts/package-source.py` で持ち出し用ソースZIPを作成できます。
+
+## 現在のUI方針
+
+旧A/B案は利用者のフィードバックで廃止。検索・テーマ・整列した画像一覧を中心に変更しました。サイトの操作文言には句読点を使わず短く具体的に表記します。投稿本文・チャット・技術資料の句読点は保持します。現在の試作は再確認待ちです。
