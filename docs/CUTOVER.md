@@ -104,3 +104,25 @@ configuration-result.jsonは2026-11-16T03:54:01Z success=true configuration_priv
 現在の設定はorigin=https://brand-new.tokyo legacy_public_enabled=false public_indexing=false adsense.enabled=false。本番公開入口へは未配置。DB用のdatabase.php/db-password.txtは非公開600で保持。今回削除したのは管理者パスワードの一時入力ファイルのみ。
 
 これは初期設定とCLI接続確認であり 実HTTPSのログイン・Cookie/セッション・画像アップロード確認ではない。次は公開用入口と復旧用入口の具体化 実HTTPSでの確認 最新差分と広告の確認 本番切替の承認。WordPress・PHP設定・DNSは未変更。追加パスワード入力は現時点で不要。
+
+## 公開フォルダ入替方式の準備 2026-11-16
+
+切替は既存public_htmlの入口だけを上書きする方式ではなく フォルダ全体を非公開領域へ退避し新公開フォルダに入れ替える方式を候補とする。旧WordPressのPHPや旧アップロードファイルへの直接アクセスを新サイトに残さないため。まだフォルダ入替・PHP変更・公開設定変更は行っていない。
+
+準備済み（13:01/13:05 JST）：
+- 配備ルート/private/cutover/rollback に現行index.php .htaccess .user.iniのコピーとハッシュを保存し一致確認。
+- 同public-nextに新index.php .htaccess .user.iniと空の.well-known/acme-challengeを作成。親フォルダ700の非公開状態。実配置時はpublic-next自体を755へ変更する必要あり。
+- 新入口はPHP8.3未満では503となる。本体・DB・設定・画像は公開フォルダ外を参照する。HTTPSと正規ホストへの転送を設定。
+- 旧.user.iniはparse_ini_fileで確認しauto_prepend_file/auto_append_fileは両方空。初回の単純な正規表現による「あり」は空行の読み取りによる誤検知であり 後続確認を優先。
+- 旧.htaccessの転送はHTTPS化1件。PHP実行ハンドラーの記述は観測していない。サーバーパネル側PHP設定が別に必要。
+
+今後の切替操作案（未承認・未実行）：
+1. 現行公開フォルダの入口3ファイルが保存時ハッシュと一致すること 最新記事・コメントの差分 キャッシュ・広告設定を確認。
+2. 新設定の旧公開記事表示と検索登録を有効化する準備を行う。private/draft記事は公開対象にしない。
+3. 利用者の明示承認後 public_htmlをprivate/cutover/wordpress-before-switchへ退避しpublic-nextをpublic_htmlに配置。PHP8.3以上へ変更。DNSは変更しない。設定の反映待ち中は短時間503になる可能性がある。
+4. HTTPSで公開記事・画像・配布・ログイン・非公開制御を確認する。
+5. 不具合時は新public_htmlを別名で保持して旧フォルダを元へ戻し PHP7.4.33に戻す。新DBを消去・上書きしない。原本フォルダや既存バックアップは削除しない。
+
+public-nextを実際にWebサーバーで使用していないため ApacheのRewrite/HTTPS/PHP実行・.user.ini反映は未確認。フォルダ入替の自動実行コードもまだ用意していない。candidate/index.phpは前案の参考ファイルで使用しない public-next/index.phpを現行候補とする。
+
+公式確認先：.htaccess上書きによりPHPバージョンへ影響しうる https://www.xserver.ne.jp/support/faq/service_php_rewrite_version.php 。キャッシュ除外条件 https://www.xserver.ne.jp/manual/man_server_cache.php 。本番での実レスポンス確認は別途必要。

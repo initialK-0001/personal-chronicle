@@ -202,3 +202,13 @@ configuration-result.jsonは2026-11-16T03:54:01Z success=true configuration_priv
 現在の設定はorigin=https://brand-new.tokyo legacy_public_enabled=false public_indexing=false adsense.enabled=false。本番公開入口へは未配置。DB用のdatabase.php/db-password.txtは非公開600で保持。今回削除したのは管理者パスワードの一時入力ファイルのみ。
 
 これは初期設定とCLI接続確認であり 実HTTPSのログイン・Cookie/セッション・画像アップロード確認ではない。次は公開用入口と復旧用入口の具体化 実HTTPSでの確認 最新差分と広告の確認 本番切替の承認。WordPress・PHP設定・DNSは未変更。追加パスワード入力は現時点で不要。
+
+## 2026-11-16 本番入口の保全とサーバー内部HTTP確認
+
+prepare-cutover.phpが現行public_htmlのindex.php .htaccess .user.iniを非公開領域private/cutover/rollbackへコピーしSHA-256を照合。処理前後で現行ファイルのハッシュ不変。prepare-public-directory.phpがprivate/cutover/public-nextへ入口・Rewrite・PHP設定候補を生成。現行転送はHTTPSへの301のみ。auto_prepend/appendはINIパーサーで両方空を確認（前段の正規表現の判定を訂正）。新公開フォルダは未配置でありApache Rewriteの実検証ではない。
+
+server-http-check.phpが実サーバー上のPHP8.3内蔵HTTPサーバーを127.0.0.1の空きポートだけに起動。秘密設定の一時コピーでlocal_test=true 旧記事表示true 検索登録falseを設定し 実MySQLの取込済みデータをGETで確認。本番設定JSONは変更せず 新サーバーを外部インターフェースで待受させていない。
+
+結果13:07 JST：公開URL207件が200 text/html noindex。管理画面は303 管理APIは401 開発サイトマップは404。旧private/draftのうち非空かつ公開記事と同一パスでない174件は404。空パス等を含む全196件を個別URLとして確認したという意味ではない。投稿・コメント・公開設定の更新は行っていない。確認サーバーを終了し結果server-http-check.json success=trueを確認 Cron OFFを確認。
+
+未確認：外部HTTPS Apache/nginxのRewrite・キャッシュ PHP-FPM/CGIの挙動 ログインのブラウザー操作 全画像・配布のHTTP取得 最新WordPress差分 広告のアカウント設定。今回の内部HTTP成功を本番切替完了と扱わない。秘密設定・セッション・ログの一時コピーは非公開フォルダhttp-check-*に保持しGitへ含めない。
