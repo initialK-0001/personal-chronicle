@@ -84,6 +84,18 @@ with tempfile.TemporaryDirectory() as tmp:
   assert anon.open(origin+public).headers['Content-Type']=='image/png'
   assert call(a,f'/api/admin/posts/{imageid}',{'action':'unpublish','revision':2},token)[0]==200
   assert call(anon,public)[0]==404
+  assert call(a,f'/api/admin/posts/{imageid}',{'action':'release','revision':3},token)[0]==200
+  assert call(anon,f'/api/admin/posts/{imageid}',{'action':'trash','revision':4})[0] in (401,403)
+  assert call(a,f'/api/admin/posts/{imageid}',{'action':'trash','revision':4},token)[0]==200
+  assert call(anon,public)[0]==404
+  assert call(anon,f'/?post={imageid}')[0]==404
+  assert str(imageid) not in [p['id'] for p in call(anon,'/api/public/posts')[1]['posts']]
+  assert call(a,f'/api/admin/posts/{imageid}',{'action':'release','revision':5},token)[0]==409
+  assert call(a,f'/api/admin/posts/{imageid}',{'action':'restore','revision':5},token)[0]==200
+  assert call(anon,public)[0]==404
+  assert anon.open(origin+f'/admin?edit={imageid}').geturl()==origin+'/login'
+  editor_html=a.open(origin+f'/admin?edit={imageid}').read().decode()
+  assert '<section id="editor"' in editor_html and '<dialog id="editor"' not in editor_html
   try:anon.open(origin+src);raise AssertionError('private image exposed')
   except urllib.error.HTTPError as e:assert e.code==401
   # Exercise the exact UI bridge, including reopen on a second session and stale saves.

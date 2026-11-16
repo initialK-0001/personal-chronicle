@@ -277,3 +277,10 @@ AdSenseで自動広告OFF 自動最適化OFFの保存を確認。欧州向けメ
 実画面でeditormetaのlabel表示指定がhidden属性に優先し 親作品欄が作品全体でも見える問題を発見。#workParentLabel[hidden]の非表示指定を追加 既存CSS全内容を照合して本番へ反映。変更前CSSはprivate/works-before-20261116/previous/xserver/ui/style.cssに保全済み。配備スクリプトの7ファイルに加えてCSS1ファイルを修正。
 
 修正後の本番ブラウザーで作品全体の親欄display:none バージョン選択時display:flexを確認。作品全体へ戻した後サーバーに保存済みを確認して終了。空下書きは非公開を維持 公開作品集は空。
+
+## 2026-11-16 投稿削除と編集URL
+PHP全11テスト成功。storeテストで公開投稿・下書きの削除と非公開復元 下書き本文と元日時保持 削除済みへの保存・公開拒否 古いrevisionの拒否を確認。worksテストで親削除後の子投稿維持 関連秘匿 復元・再公開後の関連回復を確認。backupテストにゴミ箱内のバージョン紹介を含め 全テーブル復元一致を確認。
+実HTTP統合では匿名削除拒否 削除後の公開画像404 個別記事404 公開一覧除外 削除済み公開409 復元後も画像非公開を確認。編集URLの管理認証と非dialogテンプレートを確認。JS2ファイル構文検証成功。
+本番18:11:02 JST post-editor-deployment.json success=true 5ファイルのハッシュ一致 コードのみ更新 DBスキーマ変更・記事作成なし 変更前ファイルprivate/post-editor-before-20261116/previousへ保全。
+
+18:17:02 JST post-delete-confirmation.json success=true 追加3ファイル一致 Cron OFF。ブラウザー標準confirmで自動操作が応答しなかったためサイト内dialogへ変更。旧画面はキャンセル 削除は修正後の画面で実施。空下書きID3の削除キャンセル ゴミ箱への移動 一覧除外 ゴミ箱から非公開復元 同じIDの再編集と再読み込み 保存して一覧へを実ブラウザーで確認。本文は空のまま維持 新規の試験投稿作成・公開なし。他の入力済み下書きは変更なし。最終画面は専用URL /admin?edit=3 に通常ページとして表示。

@@ -52,7 +52,7 @@ final class Store {
         $q=$this->db->prepare('INSERT INTO chronicle_posts(draft_json,created_at) VALUES(?,?)');$q->execute([self::json($p),$now]);return $this->one((int)$this->db->lastInsertId());
     }
     public function change(int $id,int $expected,string $action,?array $content=null):array {
-        if(!in_array($action,['draft','release','unpublish'],true))throw new Failure('未対応の操作です');
+        if(!in_array($action,['draft','release','unpublish','trash','restore'],true))throw new Failure('未対応の操作です');
         $p=$content===null?null:self::content($content);if($p!==null)$this->validateImages($p);
         $this->db->beginTransaction();
         try {
@@ -60,7 +60,9 @@ final class Store {
             $q=$this->db->prepare('UPDATE chronicle_posts SET revision=revision+1 WHERE id=? AND revision=?');$q->execute([$id,$expected]);
             if($q->rowCount()!==1)throw new Failure('別の端末で変更されています 入力を残して読み直してください',409);
             $r=$this->one($id);$now=gmdate('Y-m-d\TH:i:s\Z');
-            if($action!=='unpublish')(new Works($this))->validate($p??json_decode($r['draft_json'],true,512,JSON_THROW_ON_ERROR),$id);
+            if($r['visibility']==='trash'&&$action!=='restore')throw new Failure('削除済みです ゴミ箱から戻してください',409);
+            if($action==='restore'&&$r['visibility']!=='trash')throw new Failure('削除されていません',409);
+            if(in_array($action,['draft','release'],true))(new Works($this))->validate($p??json_decode($r['draft_json'],true,512,JSON_THROW_ON_ERROR),$id);
             if($action==='draft'){
                 if($p===null)throw new Failure('本文を指定してください');
                 $q=$this->db->prepare('UPDATE chronicle_posts SET draft_json=? WHERE id=?');$q->execute([self::json($p),$id]);
@@ -68,7 +70,8 @@ final class Store {
                 $p=$p??json_decode($r['draft_json'],true,512,JSON_THROW_ON_ERROR);
                 if(!array_filter($p['blocks'],fn($b)=>$b['type']==='image'||trim($b['text']??'')!==''))throw new Failure('本文を追加してください');
                 $q=$this->db->prepare("UPDATE chronicle_posts SET draft_json=?,snapshot_json=?,visibility='public',published_at=?,updated_at=? WHERE id=?");$q->execute([self::json($p),self::json($p),$r['published_at']??$now,$now,$id]);
-            }else{$q=$this->db->prepare("UPDATE chronicle_posts SET visibility='private' WHERE id=?");$q->execute([$id]);}
+            }elseif($action==='trash'){$q=$this->db->prepare("UPDATE chronicle_posts SET visibility='trash' WHERE id=?");$q->execute([$id]);}
+            else{$q=$this->db->prepare("UPDATE chronicle_posts SET visibility='private' WHERE id=?");$q->execute([$id]);}
             $next=$this->one($id);$q=$this->db->prepare('INSERT INTO chronicle_history(post_id,revision,action,snapshot_json,saved_at) VALUES(?,?,?,?,?)');$q->execute([$id,$next['revision'],$action,self::json($next),$now]);
             $this->db->commit();return $next;
         }catch(\Throwable $e){if($this->db->inTransaction())$this->db->rollBack();throw $e;}
@@ -82,11 +85,11 @@ final class Store {
     }
     private function validateImages(array $p):void{foreach($p['blocks'] as $b)if($b['type']==='image'){$q=$this->db->prepare('SELECT hash FROM chronicle_assets WHERE hash=?');$q->execute([basename($b['src'])]);if(!$q->fetchColumn())throw new Failure('画像を確認できません');}}
     public function state(?int $draftId=null):array {
-        $posts=[];$versions=[];$draft=null;
+        $posts=[];$trash=[];$versions=[];$draft=null;
         foreach($this->db->query('SELECT * FROM chronicle_posts ORDER BY id DESC')->fetchAll() as $r){
-            $p=json_decode($r['draft_json'],true,512,JSON_THROW_ON_ERROR);$p+=['id'=>(string)$r['id'],'date'=>$r['published_at'],'updatedAt'=>$r['updated_at'],'visibility'=>$r['visibility']];$posts[]=$p;$versions[(string)$r['id']]=(int)$r['revision'];if((int)$r['id']===$draftId)$draft=$p;
+            $p=json_decode($r['draft_json'],true,512,JSON_THROW_ON_ERROR);$p+=['id'=>(string)$r['id'],'date'=>$r['published_at'],'updatedAt'=>$r['updated_at'],'visibility'=>$r['visibility']];if($r['visibility']==='trash')$trash[]=$p;else $posts[]=$p;$versions[(string)$r['id']]=(int)$r['revision'];if((int)$r['id']===$draftId&&$r['visibility']!=='trash')$draft=$p;
         }
-        return ['state'=>['posts'=>$posts,'draft'=>$draft],'etag'=>(object)$versions];
+        return ['state'=>['posts'=>$posts,'draft'=>$draft,'trash'=>$trash],'etag'=>(object)$versions];
     }
     public function stageImport(array $records):array {
         $this->db->beginTransaction();$added=0;$same=0;

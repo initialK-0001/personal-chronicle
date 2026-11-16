@@ -61,3 +61,13 @@ header .brand,.mainnav button{background:transparent}.mainnav button[aria-presse
 
 .works-admin #workForm>label{display:block;margin:1rem 0}.works-admin #workTitle{display:block;width:100%;margin-top:.4rem}.works-admin #workForm textarea{font:inherit;padding:.8rem;border:1px solid #bbb;border-radius:3px}.works-admin #worksList button{text-align:left;overflow-wrap:anywhere}.browse-nav>a{display:block;padding:.7rem .8rem;color:inherit;text-decoration:none}.browse-nav>a:hover{background:#e7f4e9}
 #workParentLabel[hidden]{display:none}
+
+/* 投稿編集は固有URLを持つ通常ページ */
+#editor[hidden]{display:none}
+#editor{max-width:960px;margin:24px auto 48px;background:white;border:1px solid var(--line)}
+.editing-page .layout,.editing-page footer,.editing-page #searchForm,.editing-page .account{display:none}
+.editing-page .editorhead{flex-wrap:wrap}
+.editing-page .paper{min-height:45vh}
+@media(max-width:640px){#editor{margin:0;border:0}.editing-page .editorhead{gap:10px}.editing-page .editorhead #saveState{order:3;flex-basis:100%;max-width:none}}
+
+#deleteDialog{max-width:440px;padding:24px}#deleteDialog h2{font-size:18px;margin-top:0}#deleteDialog button{margin:12px 8px 0 0}

@@ -23,3 +23,8 @@ $pose=doc('ポーズ',['role'=>'work','parent'=>null]);$pose['tags']=['ポーズ
 $pose['work']=null;$s->create($pose); // Normal pose posts remain allowed.
 check((int)$s->db->query('SELECT COUNT(*) FROM chronicle_works')->fetchColumn()===0);
 echo "紹介は通常投稿として一度だけ保存 タイムライン・作品集同一URL 公開分離 親非公開 競合 ポーズ除外を確認\n";
+$s->change($aid,6,'release',doc('Karen',['role'=>'work','parent'=>null]));
+$s->change($aid,7,'trash');check(count($s->publicPosts())===2&&$w->published($s->publicPosts())===[]);foreach($s->publicPosts() as $post)check($post['work']===null);
+$s->change($aid,8,'restore');check($w->published($s->publicPosts())===[]);
+$s->change($aid,9,'release');check(count($w->published($s->publicPosts()))===2);
+echo "親作品の削除・非公開復元・明示再公開で関連保持を確認\n";

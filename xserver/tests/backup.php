@@ -17,6 +17,7 @@ try{
  (new Chronicle\Contact($s,str_repeat('s',32),true))->submit(['body'=>'非公開の問い合わせ','email'=>'test@example.test'],'test');
  $work=$s->create(['title'=>'Karen','tags'=>[],'blocks'=>[['type'=>'paragraph','text'=>'紹介']],'work'=>['role'=>'work','parent'=>null]]);$s->change((int)$work['id'],1,'release');$s->create(['title'=>'初版','tags'=>[],'blocks'=>[],'work'=>['role'=>'version','parent'=>(string)$work['id']]]);
 
+ $s->change(4,1,'trash');
  $summary=Backup::export($s,$src,$root.'/backup');check($summary['chronicle_comments']===2,'コメント保全');
  rejects(fn()=>Backup::export($s,$src,$root.'/backup'));rejects(fn()=>Backup::export($s,$src,$src['legacy_uploads'].'/recursive'));
  $target=config($root,'restored');$t=new Store(new PDO('sqlite:'.$root.'/target.sqlite'));$t->initialize();Backup::restore($t,$target,$root.'/backup');
