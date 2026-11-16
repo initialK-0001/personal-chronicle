@@ -43,7 +43,7 @@ final class Web {
         return $html;
     }
     public static function sitemap(string $origin,array $posts,Legacy $legacy,array $works=[]):string {
-        $urls=[rtrim($origin,'/').'/',rtrim($origin,'/').'/works'];foreach($works as $w)$urls[]=rtrim($origin,'/').'/works/'.$w['id'];foreach($posts as $p)$urls[]=rtrim($origin,'/').'/?post='.rawurlencode($p['id']);
+        $urls=[rtrim($origin,'/').'/',rtrim($origin,'/').'/works'];foreach($posts as $p)$urls[]=rtrim($origin,'/').'/?post='.rawurlencode($p['id']);
         foreach($legacy->records() as $r)$urls[]=self::url($origin,$r['path']);foreach($legacy->categories() as $c)$urls[]=self::url($origin,$c['path']);
         return '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'.implode('',array_map(fn($u)=>'<url><loc>'.self::escape($u).'</loc></url>',array_unique($urls))).'</urlset>';
     }

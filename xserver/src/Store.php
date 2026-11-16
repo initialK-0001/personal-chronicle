@@ -41,13 +41,14 @@ final class Store {
             if($b['type']==='link'){$url=$s($b['url']??'',4000);if(!filter_var($url,FILTER_VALIDATE_URL)||!in_array(strtolower(parse_url($url,PHP_URL_SCHEME)??''),['http','https'],true))throw new Failure('リンクが不正です');$x['url']=$url;}
             $out['blocks'][]=$x;
         }
+        $out['work']=Works::relation($p['work']??null);
         if(strlen(self::json($out))>900000)throw new Failure('投稿が大きすぎます',413);
         return $out;
     }
     public static function json($value):string{return json_encode($value,JSON_THROW_ON_ERROR|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);}
     public function one(int $id):array {$q=$this->db->prepare('SELECT * FROM chronicle_posts WHERE id=?');$q->execute([$id]);$r=$q->fetch();if(!$r)throw new Failure('投稿がありません',404);return $r;}
     public function create(array $content):array {
-        $p=self::content($content);$this->validateImages($p);$now=gmdate('Y-m-d\TH:i:s\Z');
+        $p=self::content($content);$this->validateImages($p);(new Works($this))->validate($p);$now=gmdate('Y-m-d\TH:i:s\Z');
         $q=$this->db->prepare('INSERT INTO chronicle_posts(draft_json,created_at) VALUES(?,?)');$q->execute([self::json($p),$now]);return $this->one((int)$this->db->lastInsertId());
     }
     public function change(int $id,int $expected,string $action,?array $content=null):array {
@@ -59,6 +60,7 @@ final class Store {
             $q=$this->db->prepare('UPDATE chronicle_posts SET revision=revision+1 WHERE id=? AND revision=?');$q->execute([$id,$expected]);
             if($q->rowCount()!==1)throw new Failure('別の端末で変更されています 入力を残して読み直してください',409);
             $r=$this->one($id);$now=gmdate('Y-m-d\TH:i:s\Z');
+            if($action!=='unpublish')(new Works($this))->validate($p??json_decode($r['draft_json'],true,512,JSON_THROW_ON_ERROR),$id);
             if($action==='draft'){
                 if($p===null)throw new Failure('本文を指定してください');
                 $q=$this->db->prepare('UPDATE chronicle_posts SET draft_json=? WHERE id=?');$q->execute([self::json($p),$id]);
@@ -73,7 +75,10 @@ final class Store {
     }
     public function publicPosts():array {
         $rows=$this->db->query("SELECT id,snapshot_json,published_at,updated_at FROM chronicle_posts WHERE visibility='public' ORDER BY published_at DESC,id DESC")->fetchAll();
-        return array_map(function($r){$p=json_decode($r['snapshot_json'],true,512,JSON_THROW_ON_ERROR);return ['id'=>(string)$r['id'],'title'=>$p['title'],'tags'=>$p['tags'],'blocks'=>array_map(function($b){unset($b['id']);if($b['type']==='image')$b['src']=str_replace('/api/images/','/api/public/images/',$b['src']);return $b;},$p['blocks']),'date'=>$r['published_at'],'updatedAt'=>$r['updated_at']];},$rows);
+        $result=array_map(function($r){$p=json_decode($r['snapshot_json'],true,512,JSON_THROW_ON_ERROR);return ['id'=>(string)$r['id'],'title'=>$p['title'],'tags'=>$p['tags'],'work'=>$p['work']??null,'blocks'=>array_map(function($b){unset($b['id']);if($b['type']==='image')$b['src']=str_replace('/api/images/','/api/public/images/',$b['src']);return $b;},$p['blocks']),'date'=>$r['published_at'],'updatedAt'=>$r['updated_at']];},$rows);
+        $visible=[];foreach((new Works($this))->published($result) as $w)$visible[$w['id']]=true;
+        foreach($result as &$post)if(($post['work']['parent']??null)!==null&&!isset($visible[$post['work']['parent']]))$post['work']=null;unset($post);
+        return $result;
     }
     private function validateImages(array $p):void{foreach($p['blocks'] as $b)if($b['type']==='image'){$q=$this->db->prepare('SELECT hash FROM chronicle_assets WHERE hash=?');$q->execute([basename($b['src'])]);if(!$q->fetchColumn())throw new Failure('画像を確認できません');}}
     public function state(?int $draftId=null):array {

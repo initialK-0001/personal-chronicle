@@ -44,25 +44,32 @@ with tempfile.TemporaryDirectory() as tmp:
   assert call(a,f'/api/admin/posts/{id}',{'action':'release','revision':2},token)[0]==409
   assert call(b,f'/api/admin/posts/{id}',{'action':'unpublish','revision':3},t)[0]==200
   assert call(anon,'/api/public/posts')[1]['posts']==[]
-  # Work/version HTTP authorization, snapshots, CSRF and parent visibility.
-  assert call(anon,'/api/admin/works')[0]==401
-  assert call(a,'/api/admin/works',{'content':{}})[0]==403
-  workdoc={'title':'Karen','description':'公開の説明','posts':[str(id)]}
-  st,result,_=call(a,'/api/admin/works',{'content':workdoc},token);assert st==201;wid=result['work']['id']
-  st,result,_=call(a,'/api/admin/works',{'parent_id':int(wid),'content':dict(workdoc,title='初版')},token);assert st==201;vid=result['work']['id']
-  assert call(a,f'/api/admin/works/{vid}',{'revision':1,'action':'release'},token)[0]==200
+  # Introductions are ordinary posts with one canonical URL and one publication state.
+  workdoc={'title':'Karen','tags':[],'blocks':[{'type':'paragraph','text':'公開の紹介'}],'work':{'role':'work','parent':None}}
+  assert call(a,'/api/admin/posts',workdoc)[0]==403
+  st,result,_=call(a,'/api/admin/posts',workdoc,token);assert st==201;wid=result['post']['id']
+  versiondoc=dict(workdoc,title='初版',work={'role':'version','parent':str(wid)})
+  st,result,_=call(a,'/api/admin/posts',versiondoc,token);assert st==201;vid=result['post']['id']
+  assert call(a,f'/api/admin/posts/{vid}',{'revision':1,'action':'release'},token)[0]==200
   assert call(anon,'/api/public/works')[1]['works']==[]
-  assert call(a,f'/api/admin/works/{wid}',{'revision':1,'action':'release'},token)[0]==200
+  assert call(a,f'/api/admin/posts/{wid}',{'revision':1,'action':'release'},token)[0]==200
+  public=call(anon,'/api/public/posts')[1]['posts'];assert len(public)==2
   assert len(call(anon,'/api/public/works')[1]['works'])==2
-  assert all(w['posts']==[] for w in call(anon,'/api/public/works')[1]['works'])
-  assert '初版' in anon.open(origin+f'/works/{wid}').read().decode()
-  assert call(b,f'/api/admin/works/{wid}',{'revision':2,'action':'draft','content':dict(workdoc,title='秘密')},t)[0]==200
-  assert '秘密' not in anon.open(origin+f'/works/{wid}').read().decode()
-  assert call(a,f'/api/admin/works/{wid}',{'revision':2,'action':'release'},token)[0]==409
-  assert call(a,f'/api/admin/works/{wid}',{'revision':3,'action':'unpublish'},token)[0]==200
+  assert '/?post='+str(wid) in anon.open(origin+'/works').read().decode()
+  assert anon.open(origin+f'/works/{wid}').geturl()==origin+'/?post='+str(wid)
+  assert '初版' in anon.open(origin+'/?post='+str(wid)).read().decode()
+  assert '公開の紹介' in anon.open(origin+'/').read().decode()
+  assert call(b,f'/api/admin/posts/{wid}',{'revision':2,'action':'draft','content':dict(workdoc,title='秘密')},t)[0]==200
+  assert '秘密' not in anon.open(origin+'/works').read().decode()
+  assert call(a,f'/api/admin/posts/{wid}',{'revision':2,'action':'release'},token)[0]==409
+  assert call(a,f'/api/admin/posts/{wid}',{'revision':3,'action':'unpublish'},token)[0]==200
   assert call(anon,f'/works/{vid}')[0]==404
+  assert call(anon,'/?post='+str(wid))[0]==404
+  public=call(anon,'/api/public/posts')[1]['posts'];assert len(public)==1 and public[0]['work'] is None
+  assert call(a,f'/api/admin/posts/{vid}',{'revision':2,'action':'unpublish'},token)[0]==200
   assert anon.open(origin+'/admin/works').geturl()==origin+'/login'
-  assert a.open(origin+'/admin/works').status==200
+  assert a.open(origin+'/admin/works').geturl()==origin+'/admin?view=works'
+  assert call(a,'/api/admin/works',{'content':{}},token)[0]==404
   # Real decode/re-encode and public-reference authorization
   import base64
   png=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1kAAAAASUVORK5CYII=')

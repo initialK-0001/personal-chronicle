@@ -17,7 +17,11 @@ try {
         $sellers=Chronicle\Ads::sellers($config);if($sellers===null)throw new Chronicle\Failure('見つかりません',404);
         header('Content-Type: text/plain; charset=UTF-8');if($method==='GET')echo $sellers;exit;
     }
-    if($method==='GET'&&($path==='/works'||preg_match('~^/works/([1-9][0-9]*)$~D',$path,$wm)))serveHTML($works->page($path==='/works'?null:(int)$wm[1],array_merge($store->publicPosts(),$legacy->posts()),$config['origin']),true);
+    if($method==='GET'&&$path==='/works')serveHTML($works->page(array_merge($store->publicPosts(),$legacy->posts()),$config['origin']),true);
+    if($method==='GET'&&preg_match('~^/works/([1-9][0-9]*)$~D',$path,$wm)){
+        foreach($works->published($store->publicPosts()) as $w)if($w['id']===$wm[1]){header('Location: '.$w['url'],true,302);exit;}
+        throw new Chronicle\Failure('作品がありません',404);
+    }
     if($path==='/api/public/works'&&$method==='GET')respond(['works'=>$works->published(array_merge($store->publicPosts(),$legacy->posts()))]);
     if($path==='/api/public/comments'&&$method==='GET')respond(['comments'=>$comments->published(is_string($_GET['post']??null)?$_GET['post']:'')]);
     if($path==='/api/public/posts'){
@@ -35,7 +39,9 @@ try {
         if(isset($_GET['wpdmdl']))$legacy->download((int)$_GET['wpdmdl'],$config['legacy_uploads']??'');
         $posts=$store->publicPosts();$selected=null;
         if(isset($_GET['post'])){if(!is_string($_GET['post']))throw new Chronicle\Failure('記事がありません',404);foreach($posts as $p)if($p['id']===$_GET['post'])$selected=$p;if(!$selected)throw new Chronicle\Failure('記事がありません',404);}
-        serveHTML(Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($posts,$legacy->posts()),$config['origin'],$selected),true);
+        $html=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($posts,$legacy->posts()),$config['origin'],$selected);
+        if($selected)$html=str_replace('</article>',$works->navigation($selected['id'],$posts).'</article>',$html);
+        serveHTML($html,true);
     }
     if($method==='GET'&&rtrim($path,'/')==='/contact-form'){
         if(!$legacy->find('/contact-form'))throw new Chronicle\Failure('見つかりません',404);
@@ -60,18 +66,7 @@ try {
     if($path==='/api/public/comments'&&$method==='POST'){$comments->submit($input,$_SERVER['REMOTE_ADDR']??'unknown');respond(['received'=>true],202);}
     if(in_array($path,['/admin','/admin.html','/admin/comments','/admin/legacy-edit','/admin/contact','/admin/works'],true)&&!$auth->loggedIn()){header('Location: /login',true,303);exit;}
     $auth->guard();
-    if($path==='/admin/works'&&$method==='GET')serveHTML(file_get_contents(__DIR__.'/../ui/works-admin.html'));
-    if($path==='/works-admin.js'&&$method==='GET'){header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/works-admin.js');exit;}
-    if($path==='/api/admin/works'&&$method==='GET')respond(['works'=>$works->rows(),'posts'=>array_merge($store->state()['state']['posts'],(new Chronicle\Legacy($store,true))->posts())]);
-    if($path==='/api/admin/works'&&$method==='POST'){
-        if(isset($input['parent_id'])&&!is_int($input['parent_id']))throw new Chronicle\Failure('作品を確認してください');
-        respond(['work'=>$works->create($input['parent_id']??null,$input['content']??[])],201);
-    }
-    if(preg_match('~^/api/admin/works/([1-9][0-9]*)$~D',$path,$wm)&&$method==='POST'){
-        if(!is_int($input['revision']??null)||!is_string($input['action']??null)||isset($input['content'])&&!is_array($input['content']))throw new Chronicle\Failure('入力内容を確認してください');
-        respond(['work'=>$works->change((int)$wm[1],$input['revision'],$input['action'],$input['content']??null)]);
-    }
-
+    if($path==='/admin/works'&&$method==='GET'){header('Location: /admin?view=works',true,303);exit;}
     if($path==='/admin/contact'&&$method==='GET')serveHTML(file_get_contents(__DIR__.'/../ui/contact-admin.html'));
     if($path==='/contact-admin.js'&&$method==='GET'){header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/contact-admin.js');exit;}
     if($path==='/api/admin/contact'&&$method==='GET')respond(['messages'=>$contact->listing()]);

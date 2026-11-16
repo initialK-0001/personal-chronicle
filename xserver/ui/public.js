@@ -27,6 +27,8 @@ function renderContent(p){return `${p.sample?'<p class="hint">表示確認用の
 const basePage='/';
 if(new URLSearchParams(location.search).has('collections'))location.replace('/works');
 const postURL=p=>p.url||basePage+'?post='+encodeURIComponent(p.id);
+function workNavigation(p){const pool=allPosts().filter(p=>collectionEligible(p)),roots=pool.filter(p=>p.work?.role==='work'),rootIds=new Set(roots.map(p=>p.id)),versions=pool.filter(p=>p.work?.role==='version'&&rootIds.has(p.work.parent)),visible=[...roots,...versions];const link=p=>`<a href="${esc(postURL(p))}">${esc(p.title||'作品紹介')}</a>`;let html='';const parent=visible.find(x=>x.id===p.work?.parent);if(parent)html+=`<p>作品集 ${link(parent)}</p>`;if(visible.some(x=>x.id===p.id)){const children=versions.filter(x=>x.work.parent===p.id);if(children.length)html+='<h2>バージョン</h2><ul>'+children.map(x=>`<li>${link(x)}</li>`).join('')+'</ul>';const ids=new Set([p.id,...children.map(x=>x.id)]);const related=pool.filter(x=>x.work?.role==='related'&&ids.has(x.work.parent)).sort((a,b)=>(b.date||'').localeCompare(a.date||''));if(related.length)html+='<h2>関連投稿</h2><section class="feed timeline">'+related.map(x=>timelineHTML(x,postURL(x),false)).join('')+'</section>';}
+return html?`<nav class="work-navigation" aria-label="作品との関連">${html}</nav>`:'';}
 function editPost(p){}
 function renderPage(){
  const query=new URLSearchParams(location.search),postId=query.get('post');const articlePage=$('#articlePage');const collection=query.has('collections');const detail=!!postId||collection;
@@ -35,7 +37,7 @@ function renderPage(){
  if(collection){articlePage.innerHTML='<a href="'+basePage+'">一覧へ戻る</a><h1>作品集</h1><div class="collectionlinks">'+[...new Set(allPosts().filter(collectionEligible).flatMap(p=>p.tags))].map(t=>`<a href="${basePage}?works=1&theme=${encodeURIComponent(t)}">${esc(t)}</a>`).join('')+'</div>';return;}
  const p=allPosts().find(p=>p.id===postId);
  articlePage.innerHTML=`<a href="${basePage}">一覧へ戻る</a>`+(p?renderContent(p):`<h1>${loadError?'投稿を読み込めません 再読み込みしてください':loading?'読み込み中':'投稿が見つかりません'}</h1>`)+'';
- if(p)mountComments(articlePage,p.id);
+ if(p){articlePage.insertAdjacentHTML('beforeend',workNavigation(p));mountComments(articlePage,p.id);}
  document.title=p?(p.title||'投稿')+' | Brand-new TOKYO':'投稿が見つかりません | Brand-new TOKYO';
  
 }
