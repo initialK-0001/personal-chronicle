@@ -7,7 +7,12 @@ final class Legacy {
     public function __construct(Store $store,bool $enabled,string $amazonTag=""){$this->store=$store;$this->enabled=$enabled;$this->amazonTag=preg_match("/^[A-Za-z0-9_-]{1,100}$/D",$amazonTag)?$amazonTag:"";}
     public function records():array{
         if(!$this->enabled)return [];
-        $out=[];foreach($this->store->db->query("SELECT original_json FROM chronicle_imports WHERE original_status='publish'")->fetchAll() as $row){$r=json_decode($row['original_json'],true,512,JSON_THROW_ON_ERROR);if(($r['original_record']['post_password']??'')==='')$out[]=$r;}return $out;
+        $out=[];foreach($this->store->db->query("SELECT i.original_json,e.legacy_id AS edited,e.visibility,e.snapshot_json,e.published_at,e.updated_at FROM chronicle_imports i LEFT JOIN chronicle_legacy_edits e ON e.legacy_id=i.legacy_id")->fetchAll() as $row){
+            $r=json_decode($row['original_json'],true,512,JSON_THROW_ON_ERROR);
+            if($row['edited']!==null){if($row['visibility']!=='public')continue;if($row['snapshot_json']!==null){$p=json_decode($row['snapshot_json'],true,512,JSON_THROW_ON_ERROR);$r['title']=$p['title'];$r['original_html']=$p['html'];$r['published_at']=$row['published_at'];$r['updated_at']=$row['updated_at'];}}
+            elseif($r['status']!=='publish'||($r['original_record']['post_password']??'')!=='')continue;
+            $out[]=$r;
+        }return $out;
     }
     public function categories():array {
         $out=[];foreach($this->records() as $r)foreach($r['terms']??[] as $t)if(($t['taxonomy']??'')==='category'){$slug=rawurldecode($t['slug']);$out[$slug]=['path'=>'/category/'.$slug,'name'=>$t['name']];}return array_values($out);
@@ -26,7 +31,7 @@ final class Legacy {
         return preg_replace('/<iframe(?![^>]*\bsrc=)[^>]*>.*?<\/iframe>/s','',(new \HTMLPurifier($config))->purify($raw));
     }
     public function posts():array{
-        $out=[];foreach($this->records() as $r){if($r['type']!=='post')continue;$html=$this->html($r['original_html']);$blocks=[];
+        $out=[];foreach($this->records() as $r){if($r['type']!=='post')continue;$html=str_replace('/api/images/','/api/public/images/',$this->html($r['original_html']));$blocks=[];
             $thumb=$r['thumbnail']??null;
             if(!$thumb&&preg_match('/<img[^>]+src="([^"]+)"/',$html,$m))$thumb=html_entity_decode($m[1],ENT_QUOTES,'UTF-8');
             if($thumb)$blocks[]=['type'=>'image','src'=>$thumb,'alt'=>''];
@@ -34,9 +39,13 @@ final class Legacy {
             $out[]=['id'=>'legacy-'.$r['legacy_id'],'url'=>$r['path'],'title'=>$r['title'],'tags'=>array_values(array_map(fn($t)=>$t['name'],$r['terms'])),'date'=>$r['published_at'],'updatedAt'=>$r['updated_at'],'blocks'=>$blocks];
         }return $out;
     }
-    public function media(string $path,string $uploads):void{
+    public function referencesImage(string $id):bool {
+        foreach($this->records() as $r)if(str_contains($r['original_html'],$id)&&preg_match('~(?:src=["\'])(?:/api/images/|/api/public/images/)'.preg_quote($id,'~').'["\']~',$this->html($r['original_html'])))return true;return false;
+    }
+    public function media(string $path,string $uploads,bool $admin=false):void{
         $path=rawurldecode($path);$prefix='/wp-content/uploads/';$allowed=false;
-        foreach($this->records() as $r){if(($r['thumbnail']??'')===$path)$allowed=true;
+        $records=$this->records();if($admin)$records=array_map(fn($row)=>json_decode($row['original_json'],true,512,JSON_THROW_ON_ERROR),$this->store->db->query('SELECT original_json FROM chronicle_imports')->fetchAll());
+        foreach($records as $r){if(($r['thumbnail']??'')===$path)$allowed=true;
             if(preg_match('~'.preg_quote($path,'~').'(?=[?"\'<>\s,)\]])~u',html_entity_decode(rawurldecode($r['original_html']),ENT_QUOTES,'UTF-8')))$allowed=true;
         }
         $root=realpath($uploads);$file=$root?realpath($root.'/'.substr($path,strlen($prefix))):false;
@@ -47,6 +56,7 @@ final class Legacy {
     public function download(int $id,string $uploads):void{
         $referenced=false;foreach($this->records() as $r)if(preg_match('/\[wpdm_package\s+[^\]]*id=["\']?'.preg_quote((string)$id,'/').'(?=["\'\s\]])/',$r['original_html']))$referenced=true;
         $q=$this->store->db->prepare('SELECT data_json FROM chronicle_downloads WHERE legacy_id=?');$q->execute([$id]);$raw=$q->fetchColumn();$d=$raw?json_decode($raw,true):null;
+        if(!$referenced)foreach($this->records() as $r)if(preg_match('~[?]wpdmdl='.$id.'(?=[&\"\'<>\\s]|$)~',$r['original_html']))$referenced=true;
         if(!$referenced||!($d['public']??false)||count($d['files'])!==1)throw new Failure('ファイルがありません',404);
         $name=$d['files'][0];$root=realpath($uploads.'/download-manager-files');$file=$root?realpath($root.'/'.$name):false;
         if(!$root||!$file||!str_starts_with($file,$root.'/')||!is_file($file))throw new Failure('ファイルがありません',404);
@@ -54,6 +64,6 @@ final class Legacy {
     }
     public function page(array $r):string{
         $e=fn($v)=>htmlspecialchars($v??'',ENT_QUOTES,'UTF-8');
-        return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'.$e($r['title']).' | Brand-new TOKYO</title><link rel="stylesheet" href="/style.css"></head><body><div class="masthead"><header><a class="brand" href="/">Brand-new TOKYO</a></header></div><main class="legacy-article"><h1>'.$e($r['title']).'</h1><time>'.$e(substr($r['published_at']??'',0,10)).'</time><div class="rendered">'.$this->html($r['original_html']).'</div><div data-comment-post="legacy-'.(int)$r['legacy_id'].'"></div><a href="/">一覧へ戻る</a></main><script type="module" src="/comments.js"></script></body></html>';
+        return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'.$e($r['title']).' | Brand-new TOKYO</title><link rel="stylesheet" href="/style.css"></head><body><div class="masthead"><header><a class="brand" href="/">Brand-new TOKYO</a></header></div><main class="legacy-article"><h1>'.$e($r['title']).'</h1><time>'.$e(substr($r['published_at']??'',0,10)).'</time><div class="rendered">'.str_replace('/api/images/','/api/public/images/',$this->html($r['original_html'])).'</div><div data-comment-post="legacy-'.(int)$r['legacy_id'].'"></div><a href="/">一覧へ戻る</a></main><script type="module" src="/comments.js"></script></body></html>';
     }
 }

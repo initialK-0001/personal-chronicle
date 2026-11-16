@@ -83,6 +83,38 @@ with tempfile.TemporaryDirectory() as tmp:
   assert '投稿' in a.open(origin+'/admin').read().decode()
   assert anon.open(origin+'/admin').geturl()==origin+'/login'
   assert 'noindex' in anon.open(origin+'/login').read().decode()
+  # Imported articles: same URL, authenticated editing, public snapshots and image authorization.
+  import sqlite3,hashlib
+  legacy={'legacy_id':100,'path':'/old-article','status':'publish','type':'post','title':'旧題','terms':[],'original_html':'<p>元本文</p>','published_at':'2022-01-01T00:00:00Z','updated_at':'2022-01-02T00:00:00Z','original_record':{'post_password':''}}
+  raw=json.dumps(legacy,ensure_ascii=False);db=sqlite3.connect(p/'db.sqlite');db.execute('INSERT INTO chronicle_imports VALUES(?,?,?,?,?)',(100,'/old-article','publish',raw,hashlib.sha256(raw.encode()).hexdigest()));db.commit();db.close()
+  (p/'legacy/download-manager-files').mkdir(parents=True);(p/'legacy/download-manager-files/test.bin').write_bytes(b'legacy download');(p/'legacy/private.png').write_bytes(png)
+  private_legacy=dict(legacy,legacy_id=101,path='/private-old',status='private',original_html='<p><img src="/wp-content/uploads/private.png"></p>');private_raw=json.dumps(private_legacy)
+  db=sqlite3.connect(p/'db.sqlite');db.execute('INSERT INTO chronicle_imports VALUES(?,?,?,?,?)',(101,'/private-old','private',private_raw,hashlib.sha256(private_raw.encode()).hexdigest()));db.execute('INSERT INTO chronicle_downloads VALUES(?,?)',(7,json.dumps({'public':True,'files':['test.bin']})));db.commit();db.close()
+  indexed['legacy_uploads']=str(p/'legacy');indexed['legacy_public_enabled']=True;(p/'config.json').write_text(json.dumps(indexed))
+  assert '元本文' in anon.open(origin+'/old-article').read().decode()
+  assert call(anon,'/api/admin/legacy/100')[0]==401
+  assert anon.open(origin+'/admin/legacy-edit').geturl()==origin+'/login'
+  assert 'contenteditable="true"' in a.open(origin+'/admin/legacy-edit').read().decode()
+  assert call(anon,'/wp-content/uploads/private.png')[0]==404
+  assert call(anon,'/admin/legacy-media/private.png')[0]==401
+  assert a.open(origin+'/admin/legacy-media/private.png').headers['Content-Type']=='image/png'
+  edit={'title':'旧記事の改稿','html':'<p>未公開の編集</p><a href="/?wpdmdl=7">配布</a><img src="'+src+'"><script>alert(1)</script>'}
+  assert call(a,'/api/admin/legacy/100',{'revision':0,'action':'draft','content':edit})[0]==403
+  assert call(a,'/api/admin/legacy/100',{'revision':0,'action':'draft','content':edit},token)[0]==200
+  assert '未公開の編集' not in anon.open(origin+'/old-article').read().decode()
+  assert call(anon,public)[0]==404
+  assert call(b,'/api/admin/legacy/100')[1]['draft']==edit
+  assert call(b,'/api/admin/legacy/100',{'revision':0,'action':'release'},t)[0]==409
+  assert call(a,'/api/admin/legacy/100',{'revision':1,'action':'release'},token)[0]==200
+  published=anon.open(origin+'/old-article').read().decode();assert '未公開の編集' in published and '<script>alert' not in published
+  assert anon.open(origin+public).status==200
+  assert anon.open(origin+'/?wpdmdl=7').read()==b'legacy download'
+  assert call(a,'/api/admin/legacy/100',{'revision':2,'action':'unpublish'},token)[0]==200
+  assert call(anon,'/old-article')[0]==404 and call(anon,public)[0]==404
+  assert call(anon,'/?wpdmdl=7')[0]==404
+  assert '/old-article' not in anon.open(origin+'/sitemap.xml').read().decode()
+  assert call(a,'/api/admin/legacy/100')[1]['draft']==edit
+  assert '<script>' not in call(a,'/api/admin/legacy-preview',{'html':'<p>本文</p><script>bad()</script>'},token)[1]['html']
   # Comments use the same anonymous CSRF protection and never expose pending text.
   status,created,_=call(a,'/api/admin/posts',doc,token);commentpost=str(created['post']['id'])
   assert call(a,'/api/admin/posts/'+commentpost,{'action':'release','revision':1},token)[0]==200

@@ -22,6 +22,8 @@ final class Store {
         $this->db->exec("CREATE TABLE IF NOT EXISTS chronicle_posts (id $id, revision INTEGER NOT NULL DEFAULT 1, draft_json $text NOT NULL, snapshot_json $text NULL, visibility VARCHAR(10) NOT NULL DEFAULT 'private', created_at VARCHAR(30) NOT NULL, published_at VARCHAR(30) NULL, updated_at VARCHAR(30) NULL)".$tail);
         $this->db->exec("CREATE TABLE IF NOT EXISTS chronicle_history (id $id, post_id BIGINT NOT NULL, revision INTEGER NOT NULL, action VARCHAR(20) NOT NULL, snapshot_json $text NOT NULL, saved_at VARCHAR(30) NOT NULL)".$tail);
         $this->db->exec("CREATE TABLE IF NOT EXISTS chronicle_imports (legacy_id BIGINT PRIMARY KEY, legacy_path VARCHAR(1000) NOT NULL, original_status VARCHAR(30) NOT NULL, original_json ".($mysql?'LONGTEXT':'TEXT')." NOT NULL, sha256 VARCHAR(64) NOT NULL)".$tail);
+        $this->db->exec("CREATE TABLE IF NOT EXISTS chronicle_legacy_edits (legacy_id BIGINT PRIMARY KEY, revision INTEGER NOT NULL, draft_json $text NOT NULL, snapshot_json $text NULL, visibility VARCHAR(10) NOT NULL, published_at VARCHAR(30) NULL, updated_at VARCHAR(30) NULL)".$tail);
+        $this->db->exec("CREATE TABLE IF NOT EXISTS chronicle_legacy_history (legacy_id BIGINT NOT NULL, revision INTEGER NOT NULL, action VARCHAR(20) NOT NULL, state_json ".($mysql?'LONGTEXT':'TEXT')." NOT NULL, saved_at VARCHAR(30) NOT NULL, PRIMARY KEY(legacy_id,revision))".$tail);
         $this->db->exec("CREATE TABLE IF NOT EXISTS chronicle_login_limits (bucket VARCHAR(64) PRIMARY KEY, attempts INTEGER NOT NULL, expires BIGINT NOT NULL)".$tail);
     }
     public static function content(array $p): array {

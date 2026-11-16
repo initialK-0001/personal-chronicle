@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__.'/../src/Store.php';require __DIR__.'/../src/Media.php';require __DIR__.'/../src/Legacy.php';require __DIR__.'/../src/Comments.php';require __DIR__.'/../src/Backup.php';
+require __DIR__.'/../src/Store.php';require __DIR__.'/../src/Media.php';require __DIR__.'/../src/Legacy.php';require __DIR__.'/../src/Comments.php';require __DIR__.'/../src/Backup.php';require __DIR__.'/../src/LegacyEditor.php';
 use Chronicle\Store;use Chronicle\Backup;
 function check($b,$m){if(!$b)throw new RuntimeException($m);}
 function rejects(callable $f){$failed=false;try{$f();}catch(RuntimeException $e){$failed=true;}check($failed,'拒否されなかった');}
@@ -13,6 +13,7 @@ try{
  $s->stageImport([['legacy_id'=>10,'path'=>'/old','status'=>'publish','original_html'=>'元本文','original_record'=>['post_password'=>'']]]);
  $s->db->exec("INSERT INTO chronicle_downloads VALUES(7,'{\"files\":[\"test.bin\"]}')");mkdir($src['legacy_uploads'].'/download-manager-files',0700);file_put_contents($src['legacy_uploads'].'/download-manager-files/test.bin',"original\0file");
  $comments=new Chronicle\Comments($s,new Chronicle\Legacy($s,true),str_repeat('x',32));$comments->submit(['post'=>'1','body'=>'承認する本文'],'test');$comments->change(1,1,'approve');$comments->change(1,2,'reply','返信');$comments->submit(['post'=>'1','body'=>'未承認の本文'],'test');
+ $editor=new Chronicle\LegacyEditor($s,new Chronicle\Legacy($s,true));$editor->change(10,0,'draft',['title'=>'旧記事','html'=>'公開する改稿']);$editor->change(10,1,'release',null);$editor->change(10,2,'draft',['title'=>'旧記事の下書き','html'=>'まだ公開しない']);
  $summary=Backup::export($s,$src,$root.'/backup');check($summary['chronicle_comments']===2,'コメント保全');
  rejects(fn()=>Backup::export($s,$src,$root.'/backup'));rejects(fn()=>Backup::export($s,$src,$src['legacy_uploads'].'/recursive'));
  $target=config($root,'restored');$t=new Store(new PDO('sqlite:'.$root.'/target.sqlite'));$t->initialize();Backup::restore($t,$target,$root.'/backup');
@@ -20,6 +21,8 @@ try{
  $manifest=json_decode(file_get_contents($root.'/backup/manifest.json'),true);foreach($manifest['rows'] as $table=>$count){$a=$s->db->query('SELECT * FROM '.$table)->fetchAll();$b=$t->db->query('SELECT * FROM '.$table)->fetchAll();check($a===$b,$table.'全列一致');}
  check(file_get_contents($target['legacy_uploads'].'/download-manager-files/test.bin')==="original\0file",'旧ファイル一致');check(hash_file('sha256',$target['images'].'/'.basename($image['src']))===basename($image['src']),'新画像一致');
  $next=$t->create(['title'=>'次','tags'=>[],'blocks'=>[]]);check((int)$next['id']===3,'採番継続');rejects(fn()=>Backup::restore($t,$target,$root.'/backup'));
+ // Version 1 backups remain readable with empty edit/history tables.
+ $data=json_decode(file_get_contents($root.'/backup/database.json'),true);$data['format']=1;unset($data['tables']['chronicle_legacy_edits'],$data['tables']['chronicle_legacy_history']);$oldDb=Store::json($data);$originalDb=file_get_contents($root.'/backup/database.json');file_put_contents($root.'/backup/database.json',$oldDb);$v1=$manifest;$v1['format']=1;$v1['files']['database.json']=hash('sha256',$oldDb);file_put_contents($root.'/backup/manifest.json',Store::json($v1));$v1target=config($root,'version1');$v1store=new Store(new PDO('sqlite::memory:'));$v1store->initialize();Backup::restore($v1store,$v1target,$root.'/backup');check((int)$v1store->db->query('SELECT COUNT(*) FROM chronicle_legacy_edits')->fetchColumn()===0,'旧形式の復元互換');file_put_contents($root.'/backup/database.json',$originalDb);file_put_contents($root.'/backup/manifest.json',Store::json($manifest));
  $evil=json_decode(file_get_contents($root.'/backup/manifest.json'),true);$evil['files']['legacy/../../escape']=str_repeat('0',64);file_put_contents($root.'/backup/manifest.json',Store::json($evil));
  $empty=config($root,'corrupt-target');$u=new Store(new PDO('sqlite::memory:'));$u->initialize();rejects(fn()=>Backup::restore($u,$empty,$root.'/backup'));file_put_contents($root.'/backup/manifest.json',Store::json($manifest));file_put_contents($root.'/backup/database.json','broken');rejects(fn()=>Backup::restore($u,$empty,$root.'/backup'));check($u->state()['state']['posts']===[],'破損時DB変更なし');check(count(scandir($empty['images']))===2,'破損時画像変更なし');
  echo "投稿・公開分離・履歴・コメント・画像・旧添付の復元一致と破損/上書き拒否を検証成功\n";

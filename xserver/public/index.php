@@ -16,7 +16,7 @@ try {
         if($method!=='GET')throw new Chronicle\Failure('未対応の操作です',405);
         respond(['posts'=>array_merge($store->publicPosts(),$legacy->posts())]);
     }
-    if(preg_match('~^/api/public/images/([a-f0-9]{64})$~D',$path,$m)&&$method==='GET')(new Chronicle\Media($store,$config['images']??''))->serve($m[1],true);
+    if(preg_match('~^/api/public/images/([a-f0-9]{64})$~D',$path,$m)&&$method==='GET')(new Chronicle\Media($store,$config['images']??''))->serve($m[1],true,$legacy->referencesImage($m[1]));
     if($method==='GET'&&str_starts_with($path,'/wp-content/uploads/'))$legacy->media($path,$config['legacy_uploads']??'');
     $publicAssets=['/style.css'=>'text/css','/timeline.js'=>'text/javascript','/public.js'=>'text/javascript','/login.js'=>'text/javascript','/comments.js'=>'text/javascript'];
     if($method==='GET'&&isset($publicAssets[$path])){header('Content-Type: '.$publicAssets[$path]);readfile(__DIR__.'/../ui'.$path);exit;}
@@ -31,7 +31,7 @@ try {
     }
     if($method==='GET'&&($r=$legacy->find($path))){$html=$legacy->page($r);$html=str_replace('</head>','<link rel="canonical" href="'.Chronicle\Web::escape(Chronicle\Web::url($config['origin'],$r['path'])).'"></head>',$html);serveHTML($html,true);}
     if($method==='GET'&&($category=$legacy->category($path))){$html=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($store->publicPosts(),$legacy->posts()),$config['origin'],null,$category['name']);$html=str_replace('</head>','<link rel="canonical" href="'.Chronicle\Web::escape(Chronicle\Web::url($config['origin'],$category['path'])).'"></head>',$html);serveHTML($html,true);}
-    if(!str_starts_with($path,'/api/')&&!str_starts_with($path,'/admin')&&$path!=='/comments-admin.js')throw new Chronicle\Failure('見つかりません',404);
+    if(!str_starts_with($path,'/api/')&&!str_starts_with($path,'/admin')&&!in_array($path,['/comments-admin.js','/legacy-admin.js'],true))throw new Chronicle\Failure('見つかりません',404);
     $auth=new Chronicle\Auth($store,$config);$auth->start();
     if($path==='/api/session'&&$method==='GET')respond(['authenticated'=>$auth->loggedIn(),'csrf'=>$_SESSION['csrf']]);
     if($method!=='GET')$auth->mutation();
@@ -44,8 +44,24 @@ try {
     }
     if($path==='/api/login'&&$method==='POST'){$auth->login(is_string($input['password']??null)?$input['password']:'');respond(['authenticated'=>true,'csrf'=>$_SESSION['csrf']]);}
     if($path==='/api/public/comments'&&$method==='POST'){$comments->submit($input,$_SERVER['REMOTE_ADDR']??'unknown');respond(['received'=>true],202);}
-    if(in_array($path,['/admin','/admin.html','/admin/comments'],true)&&!$auth->loggedIn()){header('Location: /login',true,303);exit;}
+    if(in_array($path,['/admin','/admin.html','/admin/comments','/admin/legacy-edit'],true)&&!$auth->loggedIn()){header('Location: /login',true,303);exit;}
     $auth->guard();
+    $legacyEditor=new Chronicle\LegacyEditor($store,$legacy);
+    if($path==='/admin/legacy-edit'&&$method==='GET')serveHTML(file_get_contents(__DIR__.'/../ui/legacy-admin.html'));
+    if($path==='/legacy-admin.js'&&$method==='GET'){header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/legacy-admin.js');exit;}
+    if($path==='/api/admin/legacy'&&$method==='GET')respond(['posts'=>$legacyEditor->listing()]);
+    if(preg_match('~^/api/admin/legacy/([1-9][0-9]*)$~D',$path,$m)){
+        if($method==='GET')respond($legacyEditor->editView((int)$m[1]));
+        if($method==='POST'){
+            if(!is_int($input['revision']??null)||!is_string($input['action']??null)||isset($input['content'])&&!is_array($input['content']))throw new Chronicle\Failure('更新内容を確認してください');
+            respond($legacyEditor->change((int)$m[1],$input['revision'],$input['action'],$input['content']??null));
+        }
+        throw new Chronicle\Failure('未対応の操作です',405);
+    }
+    if($path==='/api/admin/legacy-preview'&&$method==='POST'){
+        if(!is_string($input['html']??null)||strlen($input['html'])>900000)throw new Chronicle\Failure('本文を確認してください');respond(['html'=>$legacy->html($input['html'])]);
+    }
+    if($method==='GET'&&str_starts_with($path,'/admin/legacy-media/'))$legacy->media('/wp-content/uploads/'.substr($path,strlen('/admin/legacy-media/')),$config['legacy_uploads']??'',true);
     if($path==='/admin/comments'&&$method==='GET')serveHTML(file_get_contents(__DIR__.'/../ui/comments-admin.html'));
     if($path==='/comments-admin.js'&&$method==='GET'){header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/comments-admin.js');exit;}
     if($path==='/api/admin/comments'&&$method==='GET')respond(['comments'=>$comments->moderation()]);

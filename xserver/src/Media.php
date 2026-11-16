@@ -39,9 +39,9 @@ final class Media {
             return ['src'=>'/api/images/'.$id,'bytes'=>$size];
         }finally{imagedestroy($im);if($tmp!==false&&is_file($tmp))unlink($tmp);}
     }
-    public function serve(string $id,bool $public):void{
+    public function serve(string $id,bool $public,bool $legacyReference=false):void{
         if(!preg_match('/^[a-f0-9]{64}$/D',$id))throw new Failure('画像がありません',404);
-        if($public){$found=false;foreach($this->store->publicPosts() as $p)foreach($p['blocks'] as $b)if(($b['src']??'')==='/api/public/images/'.$id)$found=true;if(!$found)throw new Failure('画像がありません',404);}
+        if($public){$found=$legacyReference;foreach($this->store->publicPosts() as $p)foreach($p['blocks'] as $b)if(($b['src']??'')==='/api/public/images/'.$id)$found=true;if(!$found)throw new Failure('画像がありません',404);}
         $q=$this->store->db->prepare('SELECT mime FROM chronicle_assets WHERE hash=?');$q->execute([$id]);$mime=$q->fetchColumn();if(!$mime||!is_file($this->dir.'/'.$id))throw new Failure('画像がありません',404);
         header('Content-Type: '.$mime);header('Cache-Control: no-store');readfile($this->dir.'/'.$id);exit;
     }

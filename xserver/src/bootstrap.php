@@ -6,6 +6,7 @@ require_once __DIR__.'/Auth.php';
 require_once __DIR__.'/Comments.php';
 require_once __DIR__.'/Media.php';
 require_once __DIR__.'/Legacy.php';
+require_once __DIR__.'/LegacyEditor.php';
 function chronicle_boot():array {
     $path=getenv('CHRONICLE_CONFIG');
     if(!$path||!is_file($path))throw new Chronicle\Failure('設定ファイルを確認してください',503);
