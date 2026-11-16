@@ -31,7 +31,10 @@ for name in ['style.css','timeline.js','index.html','public.js','admin.html','ad
   s=s.replace("async function openEditor(p){", "async function openEditor(p){if(openEditor.busy)return;openEditor.busy=true;$('#newButton').disabled=true;try{")
   s=s.replace("$('#writing textarea')?.focus();}", "$('#writing textarea')?.focus();}finally{openEditor.busy=false;$('#newButton').disabled=false;}}")
   s=s.replace("if(state.draft&&state.draft.id!==p.id){message('編集中の下書きがあります 下書きから再開してください');return;}",'')
-  s=s.replace("$('#draftButton').onclick=()=>state.draft?openEditor():message('下書きはありません');","$('#draftButton').onclick=()=>{view='all';search='';tag='';render();$('#feed').innerHTML=state.posts.filter(p=>!p.date).map(p=>timelineHTML(p,postURL(p),true)).join('');$$('#feed [data-edit]').forEach(b=>b.onclick=()=>openEditor(state.posts.find(p=>p.id===b.dataset.edit)));};")
+  s=s.replace("$('#draftButton').onclick=()=>state.draft?openEditor():message('下書きはありません');","$('#draftButton').onclick=()=>{location.href=basePage+'?view=drafts';};")
+  s=s.replace("pool.filter(p=>(view!=='images'", "pool.filter(p=>(view!=='drafts'||!p.date)&&(view!=='images'")
+  s=s.replace("search?'検索結果':tag||'投稿一覧'", "view==='drafts'?'下書き':search?'検索結果':tag||'投稿一覧'")
+  s=s.replace("if(!ready||dirty||$('#editor').open||uploading)return;try{const r=await requestAPI('/api/state');state=r.state;etag=r.etag;render();}", "if(!ready||dirty||$('#editor').open||openEditor.busy||uploading)return;const version=editVersion,pending=queued;try{const r=await requestAPI('/api/state');if(dirty||$('#editor').open||openEditor.busy||uploading||editVersion!==version||queued!==pending)return;state=r.state;etag=r.etag;render();}")
   s=s.replace("'image/webp','image/gif'","'image/webp'")
   s+="\n$('#logoutButton').onclick=async()=>{if(dirty||uploading){message('保存が終わってからログアウトしてください');return;}await requestAPI('/api/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});location.href='/login';};\n"
  (out/name).write_text(s)
