@@ -5,6 +5,7 @@ require_once __DIR__.'/Web.php';
 require_once __DIR__.'/Ads.php';
 require_once __DIR__.'/Auth.php';
 require_once __DIR__.'/Comments.php';
+require_once __DIR__.'/Contact.php';
 require_once __DIR__.'/Media.php';
 require_once __DIR__.'/Legacy.php';
 require_once __DIR__.'/LegacyEditor.php';

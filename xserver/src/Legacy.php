@@ -20,13 +20,20 @@ final class Legacy {
     public function category(string $path):?array{foreach($this->categories() as $c)if(rtrim(rawurldecode($path),'/')===$c['path'])return $c;return null;}
     public function find(string $path):?array{foreach($this->records() as $r)if(rtrim(rawurldecode($r['path']),'/')===rtrim(rawurldecode($path),'/'))return $r;return null;}
     public function html(string $raw):string{
+        $raw=preg_replace_callback('~<script\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>.*?</script>~is',function($m){
+            $u=parse_url(html_entity_decode($m[1],ENT_QUOTES,'UTF-8'));
+            if(($u['scheme']??'')!=='https'||($u['host']??'')!=='map.yahooapis.jp'||($u['path']??'')!=='/MapsService/embedmap/V2/')return $m[0];
+            parse_str($u['query']??'',$q);$lat=$q['lat']??null;$lon=$q['lon']??null;
+            if(!is_string($lat)||!is_string($lon)||!preg_match('/^-?\d+(?:\.\d+)?$/D',$lat)||!preg_match('/^-?\d+(?:\.\d+)?$/D',$lon)||abs((float)$lat)>90||abs((float)$lon)>180)return '<p>地図の位置を確認できません</p>';
+            return '<p><a href="https://www.google.com/maps/search/?api=1&amp;query='.rawurlencode($lat.','.$lon).'">地図を開く</a></p>';
+        },$raw);
         // Normalize only the known YouTube embed host; repair old malformed attributes without executing source HTML.
         $raw=preg_replace_callback('~(<iframe\b[^>]*\bsrc=)(["\'])(.*?)\2~is',function($m){$url=html_entity_decode($m[3],ENT_QUOTES,'UTF-8');if(preg_match('~^(?:https?:)?//www\.youtube\.com/embed/([A-Za-z0-9_-]+)(?:[?]|$)~',$url,$v))$url='https://www.youtube.com/embed/'.$v[1];return $m[1].$m[2].htmlspecialchars($url,ENT_QUOTES,'UTF-8').$m[2];},$raw);
         $raw=preg_replace_callback('/\[blogcard\s+([^\]]+)\]/i',function($m){preg_match('/url=["\']([^"\']+)["\']/',$m[1],$a);return isset($a[1])?'<p><a href="'.htmlspecialchars($a[1],ENT_QUOTES).'">'.htmlspecialchars($a[1]).'</a></p>':htmlspecialchars($m[0]);},$raw);
         $raw=preg_replace_callback('/\[amazonjs\s+([^\]]+)\]/i',function($m){preg_match('/asin=["\']([A-Z0-9]{10})["\']/i',$m[1],$a);preg_match('/title=["\']([^"\']+)["\']/',$m[1],$t);return isset($a[1])?'<p><a href="https://www.amazon.co.jp/dp/'.$a[1].($this->amazonTag!==''?'?tag='.rawurlencode($this->amazonTag):'').'">'.htmlspecialchars($t[1]??'Amazonで商品を見る').'</a></p>':htmlspecialchars($m[0]);},$raw);
         $raw=preg_replace_callback('/\[wpdm_package\s+([^\]]+)\]/i',function($m){preg_match('/id=["\']?(\d+)/',$m[1],$a);return isset($a[1])?'<p><a href="/?wpdmdl='.$a[1].'">ファイルをダウンロード</a></p>':htmlspecialchars($m[0]);},$raw);
         $raw=preg_replace('/\[\/?caption\b[^\]]*\]/i','',$raw);
-        $raw=preg_replace('/\[contact-form-7\b[^\]]*\]/i','<p>お問い合わせフォームは移行準備中です</p>',$raw);
+        $raw=preg_replace('/\[contact-form-7\b[^\]]*\]/i','<p><a href="/contact-form#contact">お問い合わせフォームへ</a></p>',$raw);
         $config=\HTMLPurifier_Config::createDefault();$config->set('Cache.DefinitionImpl',null);$config->set('HTML.Allowed','p,br,div,span,h1,h2,h3,h4,h5,h6,blockquote,pre,code,ul,ol,li,strong,b,em,i,u,s,del,table,thead,tbody,tr,th[colspan|rowspan],td[colspan|rowspan],a[href|title],img[src|alt|width|height],iframe[src|width|height|title|frameborder],hr,sub,sup');$config->set('HTML.SafeIframe',true);$config->set('URI.SafeIframeRegexp','~^https://(?:www\.youtube\.com/embed/[A-Za-z0-9_-]+(?:[?][^\s]*)?|www\.google\.com/maps/embed(?:[?][^\s]*)?)$~D');$config->set('URI.AllowedSchemes',['http'=>true,'https'=>true,'mailto'=>true]);
         return preg_replace('/<iframe(?![^>]*\bsrc=)[^>]*>.*?<\/iframe>/s','',(new \HTMLPurifier($config))->purify($raw));
     }

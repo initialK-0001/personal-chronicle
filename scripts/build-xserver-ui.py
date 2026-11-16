@@ -13,7 +13,7 @@ for name in ['style.css','timeline.js','index.html','public.js','admin.html','ad
   s=s.replace("const postURL=p=>basePage+'?post='+encodeURIComponent(p.id);","const postURL=p=>p.url||basePage+'?post='+encodeURIComponent(p.id);")
  if name=='timeline.js':s=s.replace('<time>${date}</time>', '<time>${date}</time>${!admin?`<a href="${esc(url)}#comments">コメント</a>`:String()}')
  if name=='admin.html':
-  s=s.replace('<a href="report.html">設計資料</a>','<a href="/admin/legacy-edit">旧記事</a><a href="/admin/comments">コメント</a><button id="logoutButton">ログアウト</button>')
+  s=s.replace('<a href="report.html">設計資料</a>','<a href="/admin/legacy-edit">旧記事</a><a href="/admin/comments">コメント</a><a href="/admin/contact">お問い合わせ</a><button id="logoutButton">ログアウト</button>')
   s=re.sub(r'<section id="commentManagement".*?</section>','',s)
   s=s.replace('<a href="report.html">調査と設計</a><a href="source.zip" download>ソースを保存</a>','')
   s=s.replace('<script type="module" src="comments-admin.js"></script>','').replace('image/webp,image/gif','image/webp')

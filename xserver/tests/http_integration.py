@@ -118,6 +118,24 @@ with tempfile.TemporaryDirectory() as tmp:
   assert '/old-article' not in anon.open(origin+'/sitemap.xml').read().decode()
   assert call(a,'/api/admin/legacy/100')[1]['draft']==edit
   assert '<script>' not in call(a,'/api/admin/legacy-preview',{'html':'<p>本文</p><script>bad()</script>'},token)[1]['html']
+  # Contact messages never have a public read or approve route.
+  ct=call(anon,'/api/session')[1]['csrf']
+  assert call(anon,'/api/public/contact',{'body':'無効な受付'},ct)[0]==404
+  contact_page=dict(legacy,legacy_id=102,path='/contact-form',type='page',title='お問い合わせ',original_html='[contact-form-7 id="34"]')
+  raw=json.dumps(contact_page);db=sqlite3.connect(p/'db.sqlite');db.execute('INSERT INTO chronicle_imports VALUES(?,?,?,?,?)',(102,'/contact-form','publish',raw,hashlib.sha256(raw.encode()).hexdigest()));db.commit();db.close()
+  assert 'contactForm' in anon.open(origin+'/contact-form').read().decode()
+  assert call(anon,'/api/public/contact',{'body':'秘密の問い合わせ'})[0]==403
+  assert call(anon,'/api/public/contact',{'body':'秘密の問い合わせ','email':'test@example.test','status':'public'},ct)[0]==202
+  assert call(anon,'/api/public/contact')[0]==401
+  assert call(anon,'/api/admin/contact')[0]==401
+  assert anon.open(origin+'/admin/contact').geturl()==origin+'/login'
+  received=call(a,'/api/admin/contact')[1]['messages'][0];assert received['body']=='秘密の問い合わせ' and received['status']=='unread'
+  for path in ['/api/public/posts','/contact-form','/sitemap.xml','/']:
+   assert '秘密の問い合わせ' not in anon.open(origin+path).read().decode()
+  assert call(a,'/api/admin/contact/'+str(received['id']),{'revision':1,'action':'read'},token)[0]==200
+  assert call(a,'/api/admin/contact/'+str(received['id']),{'revision':1,'action':'archived'},token)[0]==409
+  assert call(a,'/api/admin/contact/'+str(received['id']),{'revision':2,'action':'archived'},token)[0]==200
+  assert call(a,'/api/admin/contact/'+str(received['id']),{'revision':3,'action':'unread'},token)[0]==200
   # Comments use the same anonymous CSRF protection and never expose pending text.
   status,created,_=call(a,'/api/admin/posts',doc,token);commentpost=str(created['post']['id'])
   assert call(a,'/api/admin/posts/'+commentpost,{'action':'release','revision':1},token)[0]==200

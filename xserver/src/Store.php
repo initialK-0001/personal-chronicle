@@ -15,6 +15,7 @@ final class Store {
         $id=$mysql?'BIGINT PRIMARY KEY AUTO_INCREMENT':'INTEGER PRIMARY KEY AUTOINCREMENT';
         $text=$mysql?'MEDIUMTEXT':'TEXT';
         $tail=$mysql?' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4':'';
+        $this->db->exec("CREATE TABLE IF NOT EXISTS chronicle_contact (id $id, name VARCHAR(300) NOT NULL, email VARCHAR(254) NOT NULL, subject VARCHAR(1000) NOT NULL, body TEXT NOT NULL, status VARCHAR(12) NOT NULL, revision INTEGER NOT NULL, created_at VARCHAR(30) NOT NULL)".$tail);
         $this->db->exec("CREATE TABLE IF NOT EXISTS chronicle_comments (id $id, post_key VARCHAR(80) NOT NULL, name VARCHAR(300) NOT NULL, body TEXT NOT NULL, status VARCHAR(12) NOT NULL DEFAULT 'pending', reply TEXT NULL, revision INTEGER NOT NULL DEFAULT 1, created_at VARCHAR(30) NOT NULL)".$tail);
         $this->db->exec("CREATE TABLE IF NOT EXISTS chronicle_comment_limits (bucket VARCHAR(64) PRIMARY KEY, attempts INTEGER NOT NULL, expires BIGINT NOT NULL)".$tail);
         $this->db->exec("CREATE TABLE IF NOT EXISTS chronicle_downloads (legacy_id BIGINT PRIMARY KEY, data_json TEXT NOT NULL)".$tail);

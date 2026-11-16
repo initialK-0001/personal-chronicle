@@ -12,6 +12,7 @@ final class Backup {
         'chronicle_comments'=>['id','post_key','name','body','status','reply','revision','created_at'],
         'chronicle_legacy_edits'=>['legacy_id','revision','draft_json','snapshot_json','visibility','published_at','updated_at'],
         'chronicle_legacy_history'=>['legacy_id','revision','action','state_json','saved_at'],
+        'chronicle_contact'=>['id','name','email','subject','body','status','revision','created_at'],
     ];
     private static function privatePath(string $path):void {
         $parent=realpath(dirname($path));$root=realpath(($_SERVER['DOCUMENT_ROOT']??'')?:__DIR__.'/../public');
@@ -33,26 +34,26 @@ final class Backup {
         $db=$store->db;if($db->getAttribute(\PDO::ATTR_DRIVER_NAME)==='mysql')$db->exec('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');$db->beginTransaction();
         try{
             $tables=[];foreach(self::TABLES as $table=>$cols)$tables[$table]=$db->query('SELECT '.implode(',',$cols).' FROM '.$table.' ORDER BY '.$cols[0])->fetchAll();
-            $payload=Store::json(['format'=>2,'tables'=>$tables]);if(file_put_contents($stage.'/database.json',$payload)===false)throw new RuntimeException('DBを書き出せません');chmod($stage.'/database.json',0600);
+            $payload=Store::json(['format'=>3,'tables'=>$tables]);if(file_put_contents($stage.'/database.json',$payload)===false)throw new RuntimeException('DBを書き出せません');chmod($stage.'/database.json',0600);
             $files=['database.json'=>hash('sha256',$payload)];
             foreach($tables['chronicle_assets'] as $asset){$hash=$asset['hash'];if(!preg_match('/^[a-f0-9]{64}$/D',$hash))throw new RuntimeException('画像IDが不正です');$src=$config['images'].'/'.$hash;if(!is_file($src)||!hash_equals($hash,hash_file('sha256',$src)))throw new RuntimeException('画像が欠落または変化しています');self::copy($src,$stage.'/images/'.$hash);$files['images/'.$hash]=$hash;}
             // Include all legacy uploads, not only currently public references.
             if($tables['chronicle_imports']||!empty($config['legacy_uploads']))foreach(self::legacyFiles($config['legacy_uploads']??'') as $relative=>$src){self::copy($src,$stage.'/legacy/'.$relative);$files['legacy/'.$relative]=hash_file('sha256',$stage.'/legacy/'.$relative);}
-            $manifest=['format'=>2,'created_at'=>gmdate('c'),'files'=>$files,'rows'=>array_map('count',$tables)];if(file_put_contents($stage.'/manifest.json',Store::json($manifest))===false)throw new RuntimeException('台帳を保存できません');chmod($stage.'/manifest.json',0600);
+            $manifest=['format'=>3,'created_at'=>gmdate('c'),'files'=>$files,'rows'=>array_map('count',$tables)];if(file_put_contents($stage.'/manifest.json',Store::json($manifest))===false)throw new RuntimeException('台帳を保存できません');chmod($stage.'/manifest.json',0600);
             $db->commit();if(!rename($stage,$destination))throw new RuntimeException('バックアップを確定できません');return $manifest['rows'];
         }catch(\Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;} // Incomplete .partial directory retained for diagnosis, never used as a finished backup.
     }
     private static function verify(string $source):array {
         $root=realpath($source);if(!$root||is_link($source)||!is_file($root.'/manifest.json'))throw new RuntimeException('バックアップがありません');
         $manifest=json_decode(file_get_contents($root.'/manifest.json'),true,512,JSON_THROW_ON_ERROR);
-        if(!in_array($manifest['format']??null,[1,2],true)||!is_array($manifest['files']??null)||!isset($manifest['files']['database.json']))throw new RuntimeException('バックアップ形式が不正です');
+        if(!in_array($manifest['format']??null,[1,2,3],true)||!is_array($manifest['files']??null)||!isset($manifest['files']['database.json']))throw new RuntimeException('バックアップ形式が不正です');
         foreach($manifest['files'] as $name=>$sha){
             if(!is_string($name)||!is_string($sha)||!preg_match('/^[a-f0-9]{64}$/D',$sha)||str_contains($name,'\\')||str_contains($name,"\0")||in_array('..',explode('/',$name),true)||in_array('.',explode('/',$name),true)||($name!=='database.json'&&!preg_match('~^(images/[a-f0-9]{64}|legacy/[^/].*)$~D',$name)))throw new RuntimeException('ファイル台帳が不正です');
             $file=realpath($root.'/'.$name);if(!$file||!str_starts_with($file,$root.'/')||is_link($root.'/'.$name)||!is_file($file)||!hash_equals($sha,hash_file('sha256',$file)))throw new RuntimeException('バックアップが欠落または変化しています');
         }
         $data=json_decode(file_get_contents($root.'/database.json'),true,512,JSON_THROW_ON_ERROR);
         if(($data['format']??null)!==$manifest['format'])throw new RuntimeException('DB形式が不正です');
-        if($data['format']===1){$old=array_slice(array_keys(self::TABLES),0,-2);if(array_keys($data['tables']??[])!==$old)throw new RuntimeException('DB形式が不正です');$data['tables']['chronicle_legacy_edits']=[];$data['tables']['chronicle_legacy_history']=[];}
+        if($data['format']<3){$n=$data['format']===1?6:8;$old=array_slice(array_keys(self::TABLES),0,$n);if(array_keys($data['tables']??[])!==$old)throw new RuntimeException('DB形式が不正です');foreach(array_slice(array_keys(self::TABLES),$n) as $table)$data['tables'][$table]=[];}
         if(array_keys($data['tables']??[])!==array_keys(self::TABLES))throw new RuntimeException('DB形式が不正です');
         foreach(self::TABLES as $table=>$cols){if(!is_array($data['tables'][$table]))throw new RuntimeException('DB形式が不正です');foreach($data['tables'][$table] as $row){if(!is_array($row)||array_keys($row)!==$cols)throw new RuntimeException('DB列が一致しません');foreach($row as $value)if($value!==null&&!is_scalar($value))throw new RuntimeException('DB値が不正です');}}
         foreach($data['tables']['chronicle_assets'] as $a)if(($manifest['files']['images/'.$a['hash']]??null)!==$a['hash'])throw new RuntimeException('画像台帳が一致しません');
