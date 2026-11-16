@@ -19,6 +19,11 @@ final class Legacy {
     }
     public function category(string $path):?array{foreach($this->categories() as $c)if(rtrim(rawurldecode($path),'/')===$c['path'])return $c;return null;}
     public function find(string $path):?array{foreach($this->records() as $r)if(rtrim(rawurldecode($r['path']),'/')===rtrim(rawurldecode($path),'/'))return $r;return null;}
+    public static function localUrl(string $url):string {
+        $u=parse_url($url);
+        if($u===false||($u['host']??'')!=='brand-new.tokyo'||!in_array($u['scheme']??'https',['http','https'],true)||isset($u['port'])||isset($u['user'])||isset($u['pass']))return $url;
+        return ($u['path']??'/').(isset($u['query'])?'?'.$u['query']:'').(isset($u['fragment'])?'#'.$u['fragment']:'');
+    }
     public function html(string $raw):string{
         $raw=preg_replace_callback('~<script\b[^>]*\bsrc=["\']([^"\']+)["\'][^>]*>.*?</script>~is',function($m){
             $u=parse_url(html_entity_decode($m[1],ENT_QUOTES,'UTF-8'));
@@ -35,11 +40,14 @@ final class Legacy {
         $raw=preg_replace('/\[\/?caption\b[^\]]*\]/i','',$raw);
         $raw=preg_replace('/\[contact-form-7\b[^\]]*\]/i','<p><a href="/contact-form#contact">お問い合わせフォームへ</a></p>',$raw);
         $config=\HTMLPurifier_Config::createDefault();$config->set('Cache.DefinitionImpl',null);$config->set('HTML.Allowed','p,br,div,span,h1,h2,h3,h4,h5,h6,blockquote,pre,code,ul,ol,li,strong,b,em,i,u,s,del,table,thead,tbody,tr,th[colspan|rowspan],td[colspan|rowspan],a[href|title],img[src|alt|width|height],iframe[src|width|height|title|frameborder],hr,sub,sup');$config->set('HTML.SafeIframe',true);$config->set('URI.SafeIframeRegexp','~^https://(?:www\.youtube\.com/embed/[A-Za-z0-9_-]+(?:[?][^\s]*)?|www\.google\.com/maps/embed(?:[?][^\s]*)?)$~D');$config->set('URI.AllowedSchemes',['http'=>true,'https'=>true,'mailto'=>true]);
-        return preg_replace('/<iframe(?![^>]*\bsrc=)[^>]*>.*?<\/iframe>/s','',(new \HTMLPurifier($config))->purify($raw));
+        $safe=preg_replace('/<iframe(?![^>]*\bsrc=)[^>]*>.*?<\/iframe>/s','',(new \HTMLPurifier($config))->purify($raw));
+        return preg_replace_callback('~(<(?:a|img)\b[^>]*\b(?:href|src)=")(.*?)"~is',function($m){
+            return $m[1].htmlspecialchars(self::localUrl(html_entity_decode($m[2],ENT_QUOTES,'UTF-8')),ENT_QUOTES,'UTF-8').'"';
+        },$safe);
     }
     public function posts():array{
         $out=[];foreach($this->records() as $r){if($r['type']!=='post')continue;$html=str_replace('/api/images/','/api/public/images/',$this->html($r['original_html']));$blocks=[];
-            $thumb=$r['thumbnail']??null;
+            $thumb=isset($r['thumbnail'])?self::localUrl($r['thumbnail']):null;
             if(!$thumb&&preg_match('/<img[^>]+src="([^"]+)"/',$html,$m))$thumb=html_entity_decode($m[1],ENT_QUOTES,'UTF-8');
             if($thumb)$blocks[]=['type'=>'image','src'=>$thumb,'alt'=>''];
             $blocks[]=['type'=>'paragraph','text'=>html_entity_decode(strip_tags($html),ENT_QUOTES,'UTF-8')];

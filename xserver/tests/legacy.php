@@ -16,3 +16,9 @@ check(count($l->posts())===1);echo "旧記事の公開制御・HTML無害化・�
 $tagged=new Chronicle\Legacy($s,true,'test-22');check(str_contains($tagged->html('[amazonjs asin="1234567890" title="商品"]'),'?tag=test-22'));
 $embeds=$l->html('<iframe src="https://www.youtube.com/embed/abc"></iframe><iframe src="https://www.google.com/maps/embed?pb=test"></iframe><iframe src="https://evil.example/embed/abc"></iframe><iframe src="https://www.youtube.com.evil.example/embed/abc"></iframe>');
 check(substr_count($embeds,'<iframe')===2);check(!str_contains($embeds,'evil.example'));echo "広告タグ保持・埋込先の限定を検証成功\n";
+
+$raw='<p><a href="http://brand-new.tokyo/old?x=1&amp;y=2#part">内部</a><img src="https://brand-new.tokyo/wp-content/uploads/old.jpg"><a href="https://brand-new.tokyo.evil.example/old">外部</a></p>';
+$h=$l->html($raw);check(str_contains($h,'href="/old?x=1&amp;y=2#part"'));check(str_contains($h,'src="/wp-content/uploads/old.jpg"'));check(str_contains($h,'https://brand-new.tokyo.evil.example/old'));
+check(Chronicle\Legacy::localUrl('//brand-new.tokyo/old')==='/old');
+foreach(['https://user@brand-new.tokyo/old','https://brand-new.tokyo:443/old','https://cdn.example/old','javascript:bad'] as $url)check(Chronicle\Legacy::localUrl($url)===$url);
+echo "旧サイト内URLの同一配備先参照と外部URLの保持を検証成功\n";

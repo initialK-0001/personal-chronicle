@@ -164,6 +164,11 @@ with tempfile.TemporaryDirectory() as tmp:
   t=call(anon,'/api/session')[1]['csrf']
   for _ in range(8):assert call(anon,'/api/login',{'password':'wrong'},t)[0]==401
   assert call(anon,'/api/login',{'password':'wrong'},t)[0]==429
+  # Deployment auditor also checks anonymous denial without cookies or login.
+  import importlib.util
+  spec=importlib.util.spec_from_file_location('http_audit',root.parent/'scripts/audit-http.py');auditor=importlib.util.module_from_spec(spec);spec.loader.exec_module(auditor)
+  result=auditor.audit(origin,origin,[{'url':origin+'/'}],indexing='on',local=True)
+  assert result['failed']==0,result
   # A restore target cannot serve HTTP while offline_restore is enabled.
   restore_cfg=json.loads((p/'config.json').read_text());restore_cfg['offline_restore']=True;(p/'config.json').write_text(json.dumps(restore_cfg))
   assert call(anon,'/api/public/posts')[0]==503
