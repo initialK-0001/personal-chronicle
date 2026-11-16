@@ -9,7 +9,7 @@ final class Legacy {
         if(!$this->enabled)return [];
         $out=[];foreach($this->store->db->query("SELECT i.original_json,e.legacy_id AS edited,e.visibility,e.snapshot_json,e.published_at,e.updated_at FROM chronicle_imports i LEFT JOIN chronicle_legacy_edits e ON e.legacy_id=i.legacy_id")->fetchAll() as $row){
             $r=json_decode($row['original_json'],true,512,JSON_THROW_ON_ERROR);
-            if($row['edited']!==null){if($row['visibility']!=='public')continue;if($row['snapshot_json']!==null){$p=json_decode($row['snapshot_json'],true,512,JSON_THROW_ON_ERROR);$r['title']=$p['title'];$r['original_html']=$p['html'];$r['published_at']=$row['published_at'];$r['updated_at']=$row['updated_at'];}}
+            if($row['edited']!==null){if($row['visibility']!=='public')continue;if($row['snapshot_json']!==null){$p=json_decode($row['snapshot_json'],true,512,JSON_THROW_ON_ERROR);$r['title']=$p['title'];$r['original_html']=$p['html'];$r['published_at']=$r['published_at']??$row['published_at'];$r['updated_at']=$row['updated_at'];}}
             elseif($r['status']!=='publish'||($r['original_record']['post_password']??'')!=='')continue;
             $out[]=$r;
         }return $out;

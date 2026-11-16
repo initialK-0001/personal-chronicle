@@ -20,3 +20,9 @@ $e->change(11,0,'draft',['title'=>'秘密','html'=>'秘密本文']);check($legac
 fails(fn()=>$e->change(999,0,'draft',$content),404);fails(fn()=>$e->change(10,4,'release',['title'=>'','html'=>'<script>bad()</script>']),400);check($e->one(10)['revision']===4,'拒否時ロールバック');
 check($before===$s->db->query('SELECT * FROM chronicle_imports ORDER BY legacy_id')->fetchAll(),'元本文と元データは不変');check((int)$s->db->query('SELECT COUNT(*) FROM chronicle_legacy_history')->fetchColumn()===6,'変更履歴保持');
 echo "旧記事の同一URL編集 公開分離 競合 非公開化 元日時 原文保全 HTML無害化を確認\n";
+
+// Original publication is authoritative even when an edit has a later publication timestamp.
+$s->db->exec("UPDATE chronicle_legacy_edits SET published_at='2026-11-16T00:00:00Z' WHERE legacy_id=10");
+check($legacy->find('/same-url')['published_at']===$r['published_at'],'旧記事は初出投稿日を優先');
+$listed=array_column($e->listing(),null,'id');check($listed[10]['firstPublishedAt']===$r['published_at'],'管理一覧も初出投稿日');
+$timeline=array_column($legacy->posts(),null,'id');check($timeline['legacy-10']['date']===$r['published_at'],'タイムラインの並び替え用日時は初出');

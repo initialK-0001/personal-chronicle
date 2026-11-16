@@ -16,7 +16,7 @@ final class LegacyEditor {
             'publishedAt'=>$e?$e['published_at']:(in_array($r['status'],['publish','private'],true)?($r['published_at']??null):null)];
     }
     public function listing():array {
-        $out=[];foreach($this->store->db->query('SELECT legacy_id FROM chronicle_imports ORDER BY legacy_id DESC')->fetchAll() as $r){$p=$this->one((int)$r['legacy_id']);$out[]=['id'=>$p['id'],'title'=>$p['draft']['title'],'visibility'=>$p['visibility'],'path'=>$p['path'],'publishedAt'=>$p['publishedAt']??$p['postedAt'],'updatedAt'=>$p['updatedAt']];}return $out;
+        $out=[];foreach($this->store->db->query('SELECT legacy_id FROM chronicle_imports ORDER BY legacy_id DESC')->fetchAll() as $r){$p=$this->one((int)$r['legacy_id']);$out[]=['id'=>$p['id'],'title'=>$p['draft']['title'],'visibility'=>$p['visibility'],'path'=>$p['path'],'firstPublishedAt'=>$p['postedAt']??$p['publishedAt'],'publishedAt'=>$p['publishedAt']??$p['postedAt'],'updatedAt'=>$p['updatedAt']];}return $out;
     }
     public function editView(int $id):array {$p=$this->one($id);$p['html']=$this->legacy->html($p['draft']['html']);return $p;}
     public function change(int $id,int $revision,string $action,?array $content):array {
