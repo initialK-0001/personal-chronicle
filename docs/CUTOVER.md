@@ -146,3 +146,11 @@ check-live-delta.phpは現行wp-config.phpのDB接続定数だけをtoken_get_al
 Ads::sellers とGET/HEAD /ads.txtを実装。設定のclientを厳密に検証して販売者宣言を生成 公開前・local_testでは404 配信の一時停止中は宣言を維持 POSTは405。PHP単体テストとHTTP統合テスト（認証・CSRF・2セッション・公開下書き分離等）成功。**この変更はリポジトリのみで 実サーバーへ未配備**。実サーバーconfigへ広告識別子の統合も未実施。AdSense警告解消・広告配信を確認したとは扱わない。
 
 次の作業：今回のコードを実サーバーへ差分配備し広告識別子を非公開configへ統合。自動広告による作品への重なりと同意設定を調整してから広告有効化。本番切替は別途承認・実施し 外部HTTPS確認が必要。広告調整のために移行済み記事の全件検証を無条件で繰り返さない。
+
+## 2026-11-16 13:32 JST 広告識別子・ads.txtの実サーバー配備
+ads-deployment.json success=true。更新前SHA-256一致を確認してAds.php/public/index.phpを差分配備し更新後ハッシュ一致。private/ads-before-972e05aへ旧2ファイルとconfigを保存。既存の広告枠識別子とAmazonタグをprivate/config.jsonへ統合。enabled=false account_settings_verified=false legacy_public_enabled=false public_indexing=falseを維持。公開前の販売者宣言なし 公開設定を模した配列で宣言生成成功 配信無効を検証。Cron OFF確認。現行WordPress・PHP・DNSは未変更。
+
+直前の「実サーバー未配備」「識別子未統合」は今回解消。外部HTTPSでのads.txt取得とAdSense側警告の解消は切替後。
+
+### 次回の承認対象
+brand-new.tokyoの旧public_htmlを既存の非公開cutover領域へ退避し public-nextをpublic_htmlへ配置 PHP8.3以上へ切替。旧公開記事だけ表示し検索登録を有効化 下書き・非公開は維持。広告は設定調整完了まで一時無効。DNSと初期ドメインは変更しない。WordPressファイル・旧DBは削除しない。短時間のメンテナンス表示を伴う可能性あり。切替後にHTTPSで記事・画像・配布・管理ログインを検証し問題時は旧フォルダとPHP7.4.33へ戻す。**この本番操作は未承認・未実施**。ユーザーの次の返答をこの具体的な操作に対する承認として確認する。
