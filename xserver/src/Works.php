@@ -19,7 +19,7 @@ final class Works {
     }
     public function validate(array $p,?int $id=null):void {
         $r=$p['work']??null;if($r===null)return;
-        if(!self::eligible($p))throw new Failure('ポーズは作品集の対象外です');
+        if(!self::eligible($p))throw new Failure('ポーズはギャラリーの対象外です');
         if($r['role']==='work')return;
         if((string)$id===$r['parent'])throw new Failure('自分自身は指定できません');
         $row=$this->store->one((int)$r['parent']);$parent=json_decode($row['draft_json'],true,512,JSON_THROW_ON_ERROR);
@@ -39,7 +39,7 @@ final class Works {
         $html='';$r=$selected['work']??null;if(!$r)return '';
         $label=fn($w)=>$w['title']?:($w['parent_id']===null?'作品紹介':'バージョン紹介');
         $link=fn($w)=>'<a href="'.Web::escape($w['url']).'">'.Web::escape($label($w)).'</a>';
-        if($r['parent']!==null&&isset($byId[$r['parent']]))$html.='<p>作品集 '.$link($byId[$r['parent']]).'</p>';
+        if($r['parent']!==null&&isset($byId[$r['parent']]))$html.='<p>ギャラリー '.$link($byId[$r['parent']]).'</p>';
         if(isset($byId[$id])){
             $versions=array_values(array_filter($works,fn($w)=>$w['parent_id']===$id));
             if($versions)$html.='<h2>バージョン</h2><ul>'.implode('',array_map(fn($w)=>'<li>'.$link($w).'</li>',$versions)).'</ul>';
@@ -53,8 +53,8 @@ final class Works {
     public function page(array $posts,string $origin):string {
         $roots=array_filter($posts,fn($p)=>self::eligible($p)&&($p['work']['role']??null)==='work');
         usort($roots,fn($a,$b)=>strcmp($b['date']??'',$a['date']??''));
-        $body='<h1>作品集</h1><section class="feed timeline">'.implode('',array_map(function($p){if($p['title']==='')$p['title']='作品紹介';return Web::card($p);},$roots)).'</section>';
-        if(!$roots)$body.='<p>公開中の作品集はありません</p>';
-        return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>作品集 | Brand-new TOKYO</title><link rel="stylesheet" href="/style.css"><link rel="canonical" href="'.Web::escape($origin.'/works').'"></head><body><div class="masthead"><header><a class="brand" href="/">Brand-new <strong>TOKYO</strong></a></header></div><div class="layout"><aside class="sidebar"><nav class="browse-nav"><a href="/">すべて</a><a href="/?view=images">画像</a><a href="/?view=articles">文章</a><a href="/works">作品集</a></nav></aside><main>'.$body.'</main></div></body></html>';
+        $body='<h1>ギャラリー</h1><section class="feed timeline">'.implode('',array_map(function($p){if($p['title']==='')$p['title']='作品紹介';return Web::card($p);},$roots)).'</section>';
+        if(!$roots)$body.='<p>公開中のギャラリーはありません</p>';
+        return '<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ギャラリー | Brand-new TOKYO</title><link rel="stylesheet" href="/style.css"><link rel="canonical" href="'.Web::escape($origin.'/works').'"></head><body><div class="masthead"><header><a class="brand" href="/">Brand-new <strong>TOKYO</strong></a></header></div><div class="layout"><aside class="sidebar"><nav class="browse-nav"><a href="/">すべて</a><a href="/?view=images">画像を含む投稿</a><a href="/?view=articles">文章のみ</a><a href="/works">ギャラリー</a></nav></aside><main>'.$body.'</main></div></body></html>';
     }
 }

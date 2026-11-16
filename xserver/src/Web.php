@@ -27,7 +27,7 @@ final class Web {
     public static function page(string $template,array $posts,string $origin,?array $post=null,string $theme=''):string {
         $title=$post?($post['title']?:'投稿'):($theme?:'Brand-new TOKYO');$html=preg_replace('~<title>.*?</title>~s','<title>'.self::escape($title).($title==='Brand-new TOKYO'?'':' | Brand-new TOKYO').'</title>',$template);
         $html=str_replace(['href="style.css"','src="public.js"'],['href="/style.css"','src="/public.js"'],$html);
-        if($theme!=='')$html=str_replace('<h1 id="pageTitle">投稿一覧</h1>','<h1 id="pageTitle">'.self::escape($theme).'</h1>',$html);
+        if($theme!=='')$html=str_replace('<h1 id="pageTitle">タイムライン</h1>','<h1 id="pageTitle">'.self::escape($theme).'</h1>',$html);
         if($theme!=='')$html=str_replace('<body>','<body data-theme="'.self::escape($theme).'">',$html);
         $path=$post?'/?post='.rawurlencode($post['id']):'/';
         if($post){$content='<a href="/">一覧へ戻る</a><div class="rendered"><time>'.self::date($post['date']).'</time>'.($post['title']!==''?'<h1>'.self::escape($post['title']).'</h1>':'').self::blocks($post['blocks']).'</div>';
@@ -36,7 +36,7 @@ final class Web {
         }else{
             if($theme!=='')$posts=array_values(array_filter($posts,fn($p)=>in_array($theme,$p['tags'],true)));
             usort($posts,fn($a,$b)=>strcmp($b['date']??'',$a['date']??''));
-            $html=str_replace('<section id="feed" class="feed" aria-label="投稿一覧"></section>','<section id="feed" class="feed timeline" aria-label="投稿一覧">'.implode('',array_map([self::class,'card'],$posts)).'</section>',$html);
+            $html=str_replace('<section id="feed" class="feed" aria-label="タイムライン"></section>','<section id="feed" class="feed timeline" aria-label="タイムライン">'.implode('',array_map([self::class,'card'],$posts)).'</section>',$html);
         }
         // Category callers supply their own canonical route after rendering.
         if($theme==='')$html=str_replace('</head>','<link rel="canonical" href="'.self::escape(rtrim($origin,'/').$path).'"></head>',$html);
