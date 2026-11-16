@@ -80,3 +80,17 @@ PHP候補に8.3.36（推奨）と8.4.27を確認。現行ドメインと初期�
 Cronは実行後OFFを確認。結果ファイル・合成データのバックアップ・検証クラスは公開領域外に保持。スクリプトは結果ファイルがあれば即終了し 非空DBや設定の上書きを拒否する。安易に結果ファイルを消して再実行しない。ソース保存先は `scripts/mysql-deployment-probe.php` 実行時はxserverディレクトリの隣に配置する。
 
 次は現行ドメインの既存データ取込・画像配置 管理認証 本番用設定の組立て 実HTTPS確認。初期ドメインは利用しない。本番切替とWordPress停止はまだ実施していない。
+
+## 2026-11-16 12:46 JST 既存データの実サーバー取込
+
+現行brand-new.tokyoの保存済みSQL.gzをSQLとして実行せず PHPでリテラル抽出。原本SHA-256を検証し ローカルの独立Python抽出結果と構造全件一致を確認後 専用DBへ保存。初期ドメインのDBは読まない。
+
+調査でPython抽出のサムネイル参照不具合を発見。型指定なしSQLiteで文字列の画像IDを整数post_idと比較していたため画像指定が落ちていた。intへ変換して修正し回帰試験を追加。記事本文・元レコードは変化なし。新しい私的出力はposts-import-v3.json。PHPのWordPressExportとPythonの結果は全フィールド一致。正規化JSON全体SHA-256は `205eaaba9511f05fb50931900be3567192aebbb303260518c1b32105c9644653`。
+
+配備コード：本体の横へ `WordPressExport.php` と `import-server-backup.php` を配置し `/usr/bin/php8.3` でCron実行。旧保存先 `/home/may231754/chronicle-web-backup-20261115/brand-new.tokyo/public_html/wp-content/uploads` の2016 2017 2018 2021 2022 poses pictures download-manager-filesだけをコピー。新保存先は配備パッケージ横の `private/legacy-uploads`。フォルダ700 ファイル600。コピー元・コピー先のハッシュと以前のアーカイブ監査の台帳ハッシュを照合し 7161ファイル・825489056 bytesが全件一致。台帳SHA-256は `5b85f9088e9f96f7adae61d8b831759b15133d419e74b47a8f7740a4ed5ab65a`。ポーズは作品へ分類していない。
+
+実MySQLに388記事（元状態publish192 private140 draft56）と36配布情報を保存。読み戻した全JSONと入力が一致。再取込はadded0 unchanged388 published0。新投稿の公開一覧と旧記事公開フラグfalseでの一覧は空。初回日時・更新日時・元HTML・分類・元レコード・サムネイルを保持。成功結果 `migration-import.json` は12:46:24 JST。CronはOFFを確認。原本SQL・旧バックアップは変更していない。
+
+`private/posts-import.json` と `private/legacy-media-manifest.json` は非公開保存。新画像用imagesとsessionsを700で作成。管理者パスワード入力用 `private/admin-password.txt` は空の600。`configure-server.php` は配置済みだが未実行。利用者がDBとは別の管理用パスワードを入力した後 ハッシュ・ランダムrate_secret・本番origin・非公開フラグを含むconfig.jsonを600で作成し平文入力ファイルを削除する。パスワードは12〜72バイト 本文をチャットに貼らない。設定は存在すれば上書きしない。
+
+確認：PHP抽出テスト（SQL式拒否 文字列保持 原本ハッシュ 日時 サムネイル コメント以外の設定除外 配布ファイル）成功 Python WordPress関連6件成功 実SQLの全件比較成功 PHP構文確認成功。configure-serverの本番実行・管理ログイン・実HTTP確認はまだ行っていない。全WordPressシステムの外部復元試験や本番切替まで完了したという意味ではない。

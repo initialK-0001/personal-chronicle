@@ -22,7 +22,7 @@ def export(dbpath,prefix):
   for record in records:
    q=db.execute('SELECT meta_value FROM '+prefix+'postmeta WHERE post_id=? AND meta_key=?',(record['legacy_id'],'_thumbnail_id')).fetchone()
    if q:
-    f=db.execute('SELECT meta_value FROM '+prefix+'postmeta WHERE post_id=? AND meta_key=?',(q[0],'_wp_attached_file')).fetchone()
+    f=db.execute('SELECT meta_value FROM '+prefix+'postmeta WHERE post_id=? AND meta_key=?',(int(q[0]),'_wp_attached_file')).fetchone()
     if f:record['thumbnail']='/wp-content/uploads/'+f[0]
   import importlib.util
   spec=importlib.util.spec_from_file_location('media_audit',Path(__file__).with_name('audit-media-archive.py'));mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
