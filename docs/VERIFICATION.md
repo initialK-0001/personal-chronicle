@@ -149,3 +149,15 @@ PHP全9ファイルの試験成功。新contact.phpで任意の名前/メール 
 旧記事表示時に brand-new.tokyo のHTTP/HTTPS絶対URLを相対URLへ変換。クエリー・フラグメントは維持し 異なるホスト・認証情報・明示ポート付きURLは変更しない。元の取り込み本文は不変。PHP legacy・legacy-editor・contact試験とHTTP統合試験成功。207URLのHTTP検証も修正後に再実行。
 
 未確認：実ホストのHTTPS・MySQL 全画像と配布ファイルの実取得・原本照合。外部のはてな画像と広告画像は維持し 移行・保全済みと扱わない。この監査は全本文や画面の一致を保証するものではない。
+
+## 2026-11-16 12:05 JST 実サーバーでの配置検証
+
+利用者がアップロードした522KBのZIPを展開。実配置は `/home/may231754/chronicle-app-20261116/chronicle-code-2f81eb4/xserver`。公開ディレクトリには配置していない。
+
+公開領域外にCLI専用の `runtime-probe.php` を作り サーバーパネルのCronから `/usr/bin/php8.3` で1回検証。結果が存在すれば即終了するガードとflockを使用。実行後にCronの設定状況をOFFへ変更し OFF表示を確認した。ジョブと検証ファイルは再開記録として保持。
+
+確認結果：PHP8.3.36 CLI 必須拡張pdo/pdo_mysql/pdo_sqlite/gd/dom/mbstring/exifは全て有効。CLI memory_limitは2000M。パッケージ437ファイルのSHA-256不一致0。ZIP全体のSHA-256も配備元と一致。SQLiteメモリDBでテーブル作成・投稿保存・明示公開・公開取得が成功。HTMLPurifierによるscript除去が成功。出力 `runtime-probe.json` は権限600で公開領域外に保存。
+
+本番ドメインのPHP7.4.33・WordPress・DNS・既存MySQLには変更なし。MySQL拡張の存在確認は 実MySQLへの接続・書き込み試験を意味しない。CLIのメモリ上限はWeb実行の上限とは区別する。
+
+初期ドメインのpublic_htmlには既存wp1フォルダがあるため 空きホストとしてPHP設定を変えない。初期ドメインのHTTPSアクセスは証明書名不一致で失敗し 警告回避やHTTPへの切替は行っていない。次は本番WordPressに影響しないHTTPS検証先の確保 専用永続DB・管理認証の設定 実HTTP検証。まだ本番切替可能との判定はしていない。
