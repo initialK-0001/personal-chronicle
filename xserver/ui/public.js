@@ -39,7 +39,7 @@ function renderPage(){
  
 }
 
-search=new URLSearchParams(location.search).get('search')||'';$('#search').value=search;tag=new URLSearchParams(location.search).get('theme')||'';view=new URLSearchParams(location.search).get('view')||'all';$$('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===view)));
+search=new URLSearchParams(location.search).get('search')||'';$('#search').value=search;tag=new URLSearchParams(location.search).get('theme')||document.body.dataset.theme||'';view=new URLSearchParams(location.search).get('view')||'all';$$('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.view===view)));
 
 $$('[data-view]').forEach(b=>b.onclick=()=>{if(location.search){location.href=basePage+'?view='+b.dataset.view;return;}view=b.dataset.view;$$('[data-view]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));render();});$('#search').oninput=e=>{search=e.target.value;render();};$('#searchForm').onsubmit=e=>{e.preventDefault();search=$('#search').value;if(location.search){location.href=basePage+'?search='+encodeURIComponent(search);return;}render();};$('#brand').onclick=clearFilters;$('#clearFilters').onclick=clearFilters;$('#collectionsButton').onclick=()=>{location.href=basePage+'?collections=1';};
 

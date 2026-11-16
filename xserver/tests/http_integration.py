@@ -66,6 +66,16 @@ with tempfile.TemporaryDirectory() as tmp:
   assert call(b,'/api/state',{'action':'draft','post':draft,'etag':stale},t)[0]==409
   assert call(a,'/api/state',{'action':'release','post':draft,'etag':saved['etag']},token)[0]==200
   assert call(anon,'/api/public/posts')[1]['posts'][0]['blocks'][0]['text']=='画面からの保存'
+  published_html=anon.open(origin+'/?post='+str(id)).read().decode();assert '画面からの保存' in published_html and 'rel="canonical"' in published_html
+  assert call(anon,'/?post=999999')[0]==404
+  assert call(anon,'/missing-route')[0]==404
+  assert call(anon,'/sitemap.xml')[0]==404
+  assert 'Disallow: /\n' in anon.open(origin+'/robots.txt').read().decode()
+  indexed=json.loads((p/'config.json').read_text());indexed['public_indexing']=True;(p/'config.json').write_text(json.dumps(indexed))
+  indexed_response=anon.open(origin+'/?post='+str(id));assert indexed_response.headers['X-Robots-Tag']=='index, follow';assert 'noindex,nofollow' not in indexed_response.read().decode()
+  sitemap=anon.open(origin+'/sitemap.xml').read().decode();assert '/?post='+str(id) in sitemap and '/admin' not in sitemap
+  assert anon.open(origin+'/login').headers['X-Robots-Tag']=='noindex, nofollow'
+  assert a.open(origin+'/admin').headers['X-Robots-Tag']=='noindex, nofollow'
   fresh=call(a,'/api/state')[1]
   assert call(a,'/api/state',{'action':'unpublish','id':str(id),'etag':fresh['etag']},token)[0]==200
   assert call(anon,'/api/public/posts')[1]['posts']==[]

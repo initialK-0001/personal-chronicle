@@ -132,3 +132,15 @@ php xserver/bin/restore.php /private/backups/new-snapshot
 ## 旧コメントの確認結果
 
 保存済みの2026-11-15 DBバックアップ（SHA-256 42175f697beb90f0f555a957c3a9bdcfb9789a23b340894f195dc5209608073c）を再照合。対象の wp319d61comments は0件 元SQLにも当該テーブルのINSERT文は0本。その時点の移行対象コメントはないため 新たな旧コメント取込機能は作成していない。切替直前の最新DBでも差分を確認する。他のWordPress用テーブル接頭辞のコメントを混ぜない。
+
+## 2026-11-16 URLと検索エンジン向け表示
+
+- 新投稿の個別ページとトップ一覧はサーバー側で本文HTMLを返す。JavaScript実行前にも公開スナップショットだけを表示し 下書きや非公開本文を含めない。短文140文字と141文字の境界 画像なし記事で代替画像を作らないことを試験。
+- 新投稿の非公開・存在しないIDは404。存在しない一般URLも401ではなく404。管理経路の認証は従来通り。旧記事・固定ページは元スラッグで表示し 末尾スラッシュとURLエンコード差異を照合する。
+- 公開旧記事からカテゴリーを作り `/category/スラッグ` を維持。現在のDBカテゴリーはすべて階層なしと確認。公開記事がないカテゴリーや非公開記事だけの分類は公開しない。UI上では同名テーマに対応させる。
+- `public_indexing` は未指定/falseで検索対象外。HTMLはX-Robots-Tagでnoindexとし robots.txtは全面Disallow サイトマップは404。本番切替時のみtrueにする。trueでも管理・ログインはnoindexを維持する。
+- true時は `/sitemap.xml` にトップ 新規公開投稿 旧公開記事・固定ページ 公開カテゴリーを出力。公開HTMLにcanonicalを付与。非公開化した新投稿はサイトマップからも除外。外部の検索エンジンによる実クロールは未確認。
+- `php xserver/bin/audit-public-routes.php /private/posts-import-v2.json docs/public-url-inventory.json` で既存公開台帳207件を照合。トップ1 記事・固定ページ192 カテゴリー14に一致し 未解決0。これはコード上の解決試験で 実ホストのHTTP取得試験ではない。
+- テスト `php xserver/tests/web.php` とHTTP試験でSSR本文 エスケープ 日本時間 正規URL サイトマップのXML 公開/非公開404 開発noindex 本番設定時の公開indexと管理noindexを確認。
+
+現在の切替条件と順序は [CUTOVER.md](CUTOVER.md)。本番設定変更はまだ行っていない。

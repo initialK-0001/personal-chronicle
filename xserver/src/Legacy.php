@@ -9,6 +9,10 @@ final class Legacy {
         if(!$this->enabled)return [];
         $out=[];foreach($this->store->db->query("SELECT original_json FROM chronicle_imports WHERE original_status='publish'")->fetchAll() as $row){$r=json_decode($row['original_json'],true,512,JSON_THROW_ON_ERROR);if(($r['original_record']['post_password']??'')==='')$out[]=$r;}return $out;
     }
+    public function categories():array {
+        $out=[];foreach($this->records() as $r)foreach($r['terms']??[] as $t)if(($t['taxonomy']??'')==='category'){$slug=rawurldecode($t['slug']);$out[$slug]=['path'=>'/category/'.$slug,'name'=>$t['name']];}return array_values($out);
+    }
+    public function category(string $path):?array{foreach($this->categories() as $c)if(rtrim(rawurldecode($path),'/')===$c['path'])return $c;return null;}
     public function find(string $path):?array{foreach($this->records() as $r)if(rtrim(rawurldecode($r['path']),'/')===rtrim(rawurldecode($path),'/'))return $r;return null;}
     public function html(string $raw):string{
         // Normalize only the known YouTube embed host; repair old malformed attributes without executing source HTML.

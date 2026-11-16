@@ -3,11 +3,12 @@ declare(strict_types=1);
 ini_set('display_errors','0');
 require __DIR__.'/../src/bootstrap.php';
 header('Content-Type: application/json; charset=UTF-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('X-Frame-Options: DENY');header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
-function serveHTML(string $html):void{header('Content-Type: text/html; charset=UTF-8');header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; frame-src https://www.youtube.com https://www.google.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");echo $html;exit;}
+function serveHTML(string $html,bool $public=false):void{global $config;$index=$public&&($config['public_indexing']??false)===true;header('X-Robots-Tag: '.($index?'index, follow':'noindex, nofollow'));if($index)$html=str_replace('<meta name="robots" content="noindex,nofollow">','',$html);header('Content-Type: text/html; charset=UTF-8');header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; frame-src https://www.youtube.com https://www.google.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");echo $html;exit;}
 function respond($data,int $status=200):void{http_response_code($status);echo Chronicle\Store::json($data);exit;}
 try {
     [$store,$config]=chronicle_boot();
     $legacy=new Chronicle\Legacy($store,($config['legacy_public_enabled']??false)===true,$config['legacy_amazon_tag']??'');
+    header('X-Robots-Tag: noindex, nofollow');
     $comments=new Chronicle\Comments($store,$legacy,$config['rate_secret']);
     $path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);$method=$_SERVER['REQUEST_METHOD'];
     if($path==='/api/public/comments'&&$method==='GET')respond(['comments'=>$comments->published(is_string($_GET['post']??null)?$_GET['post']:'')]);
@@ -19,8 +20,18 @@ try {
     if($method==='GET'&&str_starts_with($path,'/wp-content/uploads/'))$legacy->media($path,$config['legacy_uploads']??'');
     $publicAssets=['/style.css'=>'text/css','/timeline.js'=>'text/javascript','/public.js'=>'text/javascript','/login.js'=>'text/javascript','/comments.js'=>'text/javascript'];
     if($method==='GET'&&isset($publicAssets[$path])){header('Content-Type: '.$publicAssets[$path]);readfile(__DIR__.'/../ui'.$path);exit;}
-    if($method==='GET'&&($path==='/'||$path==='/login')){if(isset($_GET['wpdmdl']))$legacy->download((int)$_GET['wpdmdl'],$config['legacy_uploads']??'');serveHTML(file_get_contents(__DIR__.'/../ui/'.($path==='/login'?'login.html':'index.html')));}
-    if($method==='GET'&&($r=$legacy->find($path)))serveHTML($legacy->page($r));
+    if($method==='GET'&&$path==='/robots.txt'){header('Content-Type: text/plain; charset=UTF-8');echo ($config['public_indexing']??false)===true?"User-agent: *\nDisallow: /admin\nDisallow: /api/\nDisallow: /login\nSitemap: ".$config['origin']."/sitemap.xml\n":"User-agent: *\nDisallow: /\n";exit;}
+    if($method==='GET'&&$path==='/sitemap.xml'){if(($config['public_indexing']??false)!==true)throw new Chronicle\Failure('見つかりません',404);header('Content-Type: application/xml; charset=UTF-8');echo Chronicle\Web::sitemap($config['origin'],$store->publicPosts(),$legacy);exit;}
+    if($method==='GET'&&$path==='/login')serveHTML(file_get_contents(__DIR__.'/../ui/login.html'));
+    if($method==='GET'&&$path==='/'){
+        if(isset($_GET['wpdmdl']))$legacy->download((int)$_GET['wpdmdl'],$config['legacy_uploads']??'');
+        $posts=$store->publicPosts();$selected=null;
+        if(isset($_GET['post'])){if(!is_string($_GET['post']))throw new Chronicle\Failure('記事がありません',404);foreach($posts as $p)if($p['id']===$_GET['post'])$selected=$p;if(!$selected)throw new Chronicle\Failure('記事がありません',404);}
+        serveHTML(Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($posts,$legacy->posts()),$config['origin'],$selected),true);
+    }
+    if($method==='GET'&&($r=$legacy->find($path))){$html=$legacy->page($r);$html=str_replace('</head>','<link rel="canonical" href="'.Chronicle\Web::escape(Chronicle\Web::url($config['origin'],$r['path'])).'"></head>',$html);serveHTML($html,true);}
+    if($method==='GET'&&($category=$legacy->category($path))){$html=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($store->publicPosts(),$legacy->posts()),$config['origin'],null,$category['name']);$html=str_replace('</head>','<link rel="canonical" href="'.Chronicle\Web::escape(Chronicle\Web::url($config['origin'],$category['path'])).'"></head>',$html);serveHTML($html,true);}
+    if(!str_starts_with($path,'/api/')&&!str_starts_with($path,'/admin')&&$path!=='/comments-admin.js')throw new Chronicle\Failure('見つかりません',404);
     $auth=new Chronicle\Auth($store,$config);$auth->start();
     if($path==='/api/session'&&$method==='GET')respond(['authenticated'=>$auth->loggedIn(),'csrf'=>$_SESSION['csrf']]);
     if($method!=='GET')$auth->mutation();

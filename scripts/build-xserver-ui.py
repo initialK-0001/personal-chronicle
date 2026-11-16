@@ -7,6 +7,7 @@ for name in ['style.css','timeline.js','index.html','public.js','admin.html','ad
  s=(root/'dist'/name).read_text()
  if name.endswith('.js'):s=s.replace("import {samples} from './samples.js';","const samples=[];")
  if name=='public.js':
+  s=s.replace("get('theme')||'';view=","get('theme')||document.body.dataset.theme||'';view=")
   s="import {mountComments} from '/comments.js';\n"+s
   s=s.replace("document.title=p?","if(p)mountComments(articlePage,p.id);\n document.title=p?")
   s=s.replace("const postURL=p=>basePage+'?post='+encodeURIComponent(p.id);","const postURL=p=>p.url||basePage+'?post='+encodeURIComponent(p.id);")
