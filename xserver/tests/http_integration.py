@@ -9,7 +9,7 @@ with tempfile.TemporaryDirectory() as tmp:
  cfg['adsense']={'enabled':True,'account_settings_verified':True,'client':'ca-pub-0000000000000000','slot':'0000000000'}
  (p/'config.json').write_text(json.dumps(dict(cfg,local_test=True)))
  env=dict(os.environ,CHRONICLE_CONFIG=str(p/'config.json'));subprocess.run([php,str(root/'bin/setup.php')],env=env,check=True)
- server=subprocess.Popen([php,'-S',f'127.0.0.1:{port}','-t',str(root/'public'),str(root/'public/index.php')],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+ server=subprocess.Popen([php,'-d','post_max_size=32M','-S',f'127.0.0.1:{port}','-t',str(root/'public'),str(root/'public/index.php')],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
  try:
   def client():return urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
   a=client();b=client();anon=client()
@@ -85,6 +85,18 @@ with tempfile.TemporaryDirectory() as tmp:
   png=subprocess.check_output([php,'-r','$i=imagecreatetruecolor(2,2);imagepng($i);'])
   req=urllib.request.Request(origin+'/api/upload',data=png,headers={'Origin':origin,'X-CSRF-Token':token,'Content-Type':'image/png'})
   uploaded=json.loads(a.open(req).read());src=uploaded['src'];public=src.replace('/api/images/','/api/public/images/')
+  # Raw HTTP body must not be truncated at the previous 8MB threshold.
+  large_png=subprocess.check_output([php,'-r','$i=imagecreatetruecolor(2000,2000);imagesavealpha($i,true);imagepng($i,null,0);'])
+  assert len(large_png)>15000000
+  for content in [large_png,png+b'\0'*(30*1024*1024-len(png))]:
+   request=urllib.request.Request(origin+'/api/upload',data=content,headers={'Origin':origin,'X-CSRF-Token':token,'Content-Type':'image/png'})
+   response=a.open(request);assert response.status==200 and json.loads(response.read())['src'].startswith('/api/images/')
+  del large_png,content,request
+  request=urllib.request.Request(origin+'/api/upload',data=png+b'\0'*(30*1024*1024+1-len(png)),headers={'Origin':origin,'X-CSRF-Token':token,'Content-Type':'image/png'})
+  try:a.open(request);raise AssertionError('over 30MB accepted')
+  except urllib.error.HTTPError as e:assert e.code==413
+  del request
+
   assert call(anon,public)[0]==404
   imagepost={'title':'','tags':[],'blocks':[{'id':'image','type':'image','src':src,'alt':''}]}
   status,data,_=call(a,'/api/admin/posts',imagepost,token);assert status==201;imageid=data['post']['id']

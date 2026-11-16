@@ -2,12 +2,19 @@
 declare(strict_types=1);
 namespace Chronicle;
 final class Media {
+    public const MAX_BYTES=30*1024*1024;
+    public const MAX_EDGE=4000;
+    public static function prepareUpload():void {
+        $limit=ini_parse_quantity((string)ini_get('memory_limit'));
+        if($limit>0&&$limit<512*1024*1024)ini_set('memory_limit','512M');
+    }
     private Store $store;private string $dir;
     public function __construct(Store $store,string $dir){$this->store=$store;$this->dir=$dir;if(!is_dir($dir))throw new Failure('画像保存先を確認してください',503);$root=realpath(($_SERVER['DOCUMENT_ROOT']??'')?:__DIR__.'/../public');if($root&&(realpath($dir)===$root||str_starts_with(realpath($dir),$root.'/')))throw new Failure('画像は公開領域外に保存してください',503);}
     public function upload(string $bytes):array {
-        if(strlen($bytes)>8*1024*1024)throw new Failure('画像は8MBまでです',413);
+        if(strlen($bytes)>self::MAX_BYTES)throw new Failure('画像は1枚30MBまでです',413);
         $info=@getimagesizefromstring($bytes);
-        if(!$info||!in_array($info[2],[IMAGETYPE_JPEG,IMAGETYPE_PNG,IMAGETYPE_WEBP],true)||$info[0]*$info[1]>16000000)throw new Failure('画像形式または画像サイズを確認してください');
+        if(!$info||!in_array($info[2],[IMAGETYPE_JPEG,IMAGETYPE_PNG,IMAGETYPE_WEBP],true))throw new Failure('画像形式または画像サイズを確認してください');
+        if($info[0]>self::MAX_EDGE||$info[1]>self::MAX_EDGE)throw new Failure('画像の幅と高さはそれぞれ4000ピクセルまでです',413);
         // Rotation can hold two decoded images at once; reject before GD exhausts PHP memory.
         $limit=ini_parse_quantity((string)ini_get('memory_limit'));
         if($limit>0&&memory_get_usage(true)+strlen($bytes)+$info[0]*$info[1]*12+16*1024*1024>$limit)throw new Failure('画像が大きすぎます サイズを小さくしてください',413);

@@ -53,7 +53,7 @@ try {
     $auth=new Chronicle\Auth($store,$config);$auth->start();
     if($path==='/api/session'&&$method==='GET')respond(['authenticated'=>$auth->loggedIn(),'csrf'=>$_SESSION['csrf']]);
     if($method!=='GET')$auth->mutation();
-    if($path==='/api/upload'&&$method==='POST'){$auth->guard();$bytes=file_get_contents('php://input',false,null,0,8*1024*1024+1);respond((new Chronicle\Media($store,$config['images']??''))->upload($bytes));}
+    if($path==='/api/upload'&&$method==='POST'){$auth->guard();if((int)($_SERVER['CONTENT_LENGTH']??0)>Chronicle\Media::MAX_BYTES)throw new Chronicle\Failure('画像は1枚30MBまでです',413);Chronicle\Media::prepareUpload();$bytes=file_get_contents('php://input',false,null,0,Chronicle\Media::MAX_BYTES+1);respond((new Chronicle\Media($store,$config['images']??''))->upload($bytes));}
     $input=[];
     if($method==='POST'){
         if((int)($_SERVER['CONTENT_LENGTH']??0)>1000000)throw new Chronicle\Failure('容量の上限を超えています',413);
