@@ -12,10 +12,11 @@ final class LegacyEditor {
         $public=($r['status']==='publish'&&($r['original_record']['post_password']??'')==='');
         return ['id'=>$id,'path'=>$r['path'],'revision'=>$e?(int)$e['revision']:0,'visibility'=>$e?$e['visibility']:($public?'public':'private'),
             'draft'=>$e?json_decode($e['draft_json'],true,512,JSON_THROW_ON_ERROR):['title'=>$r['title']??'','html'=>$r['original_html']],
+            'postedAt'=>$r['published_at']??null,'updatedAt'=>$e['updated_at']??$r['updated_at']??null,
             'publishedAt'=>$e?$e['published_at']:(in_array($r['status'],['publish','private'],true)?($r['published_at']??null):null)];
     }
     public function listing():array {
-        $out=[];foreach($this->store->db->query('SELECT legacy_id FROM chronicle_imports ORDER BY legacy_id DESC')->fetchAll() as $r){$p=$this->one((int)$r['legacy_id']);$out[]=['id'=>$p['id'],'title'=>$p['draft']['title'],'visibility'=>$p['visibility'],'path'=>$p['path']];}return $out;
+        $out=[];foreach($this->store->db->query('SELECT legacy_id FROM chronicle_imports ORDER BY legacy_id DESC')->fetchAll() as $r){$p=$this->one((int)$r['legacy_id']);$out[]=['id'=>$p['id'],'title'=>$p['draft']['title'],'visibility'=>$p['visibility'],'path'=>$p['path'],'publishedAt'=>$p['publishedAt']??$p['postedAt'],'updatedAt'=>$p['updatedAt']];}return $out;
     }
     public function editView(int $id):array {$p=$this->one($id);$p['html']=$this->legacy->html($p['draft']['html']);return $p;}
     public function change(int $id,int $revision,string $action,?array $content):array {
