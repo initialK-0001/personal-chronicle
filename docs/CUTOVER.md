@@ -154,3 +154,17 @@ ads-deployment.json success=true。更新前SHA-256一致を確認してAds.php/
 
 ### 次回の承認対象
 brand-new.tokyoの旧public_htmlを既存の非公開cutover領域へ退避し public-nextをpublic_htmlへ配置 PHP8.3以上へ切替。旧公開記事だけ表示し検索登録を有効化 下書き・非公開は維持。広告は設定調整完了まで一時無効。DNSと初期ドメインは変更しない。WordPressファイル・旧DBは削除しない。短時間のメンテナンス表示を伴う可能性あり。切替後にHTTPSで記事・画像・配布・管理ログインを検証し問題時は旧フォルダとPHP7.4.33へ戻す。**この本番操作は未承認・未実施**。ユーザーの次の返答をこの具体的な操作に対する承認として確認する。
+
+## 2026-11-16 本番切替実施
+ユーザーから「はい。切り替えを進めてください。」の明示承認を受領。13:39:02 JST production-switch-v2.json success=true old_site_preserved=true。旧public_htmlをprivate/cutover/wordpress-before-switchへ退避し public-nextをbrand-new.tokyo/public_htmlへ配置。旧公開記事表示・検索登録を有効化 広告は無効。新旧DB・初期ドメイン・DNSは変更していない。旧WordPressファイルと旧DBは保持。
+
+13:40 JST サーバーパネルのbrand-new.tokyoがPHP8.3.36になったことを確認。初期ドメインはPHP7.4.33のまま。HTTPSトップ200 text/html Cache-Control:no-store X-Robots-Tag:index,followを確認。ブラウザーで一覧・画像表示と /adminから/loginへの転送を確認。Cron OFF確認。管理パスワードを保存・読み戻しせず ログイン成功確認はユーザー入力待ち。
+
+初回実行は差分報告の日時キーをtimeと誤記しTypeErrorで変更前停止（production-switch.json success=false rolled_back=true）。正しいstarted_at参照と不正日時の拒否へ修正し v2結果で切替成功。再実行時にガードを無条件で消さない。activate-production.phpは切替済み環境では再実行しない。
+
+復旧が必要な場合：新public_htmlを別名で非公開保存して旧wordpress-before-switchをpublic_htmlへ戻す。config-before-switch.jsonから設定を戻しPHPを7.4.33へ戻す。新DBは削除・上書きしない。PHP切替が.htaccessへ管理用記述を追加しうるため 新公開フォルダの切替後ハッシュを準備時と同一とは扱わない。広告調整とログイン後の操作確認は継続課題。
+
+### 切替後の外部HTTPS確認
+トップ・VRM表情記事・ポーズ配布記事・プライバシーページの4ページで200/HTML/正規URL/indexを確認。未ログイン管理系4経路の拒否とログイン転送を確認。追加確認：ads.txt 200 text/plain robots.txt 200 sitemap.xml 200/application+xml 非公開記事サンプル404 管理投稿API401 画像2件200 配布1件200かつattachment。旧/wp-login.phpは404を想定していたが403で拒否された。再取得も403で WordPressログイン画面は露出していない。サーバー側拒否の可能性はあるが発生元は断定していない。試験結果のfailed=1はこの期待ステータス差であり それ以外は成功。外部HTTPSで全192件・全画像を再検証したものではない。
+
+本番URL https://brand-new.tokyo/ 管理入口 https://brand-new.tokyo/admin 。ブラウザーの管理ログイン成功は未確認で ユーザーのパスワード入力待ち。新たなパスワード作成は不要。広告は承認済み方針どおり一時停止中。
