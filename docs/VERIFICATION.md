@@ -222,3 +222,10 @@ check-live-delta.phpは現行wp-config.phpのDB接続定数だけをtoken_get_al
 同じ読取専用接続で現行Cocoon共通レスポンシブ広告枠を一意特定 AmazonJSのassociateTagJPを形式検証。private/advertising-candidate.jsonへ権限600で識別子のみ保存。AmazonのaccessKeyId/secretAccessKeyを転記していない。現在のconfig.jsonにはまだ統合していない。enabled/account_settings_verifiedはfalseのままで 広告配信やAdSenseアカウント側の確認を完了したとは扱わない。
 
 構文確認と保存済みSQLを使った広告抽出の事前照合を実施。原本・現行WordPress・現行DBには書込みを行っていない。照合後の更新は自動追従しないため実切替が後日になれば再照合が必要。再実行時は結果と候補ファイルの上書き禁止ガードに従い別実行先を用意する。
+
+## 2026-11-16 AdSense確認とads.txt実装
+ユーザーが更新規約への同意を完了し 管理画面へのアクセスを確認。brand-new.tokyoは広告掲載「準備完了」。ads.txtは前回クロールで未検出。自動広告・自動最適化はON アンカー広告とサイドレール広告はON 全画面広告はOFF。プレビューは破棄しアカウント設定を変更していない。欧州・米国の同意メッセージは作成ボタンを確認しただけで 設定済みとは判断しない。
+
+Ads::sellers とGET/HEAD /ads.txtを実装。設定のclientを厳密に検証して販売者宣言を生成 公開前・local_testでは404 配信の一時停止中は宣言を維持 POSTは405。PHP単体テストとHTTP統合テスト（認証・CSRF・2セッション・公開下書き分離等）成功。**この変更はリポジトリのみで 実サーバーへ未配備**。実サーバーconfigへ広告識別子の統合も未実施。AdSense警告解消・広告配信を確認したとは扱わない。
+
+次の作業：今回のコードを実サーバーへ差分配備し広告識別子を非公開configへ統合。自動広告による作品への重なりと同意設定を調整してから広告有効化。本番切替は別途承認・実施し 外部HTTPS確認が必要。広告調整のために移行済み記事の全件検証を無条件で繰り返さない。

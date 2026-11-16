@@ -25,6 +25,8 @@ with tempfile.TemporaryDirectory() as tmp:
    try:status,session,head=call(a,'/api/session');break
    except urllib.error.URLError:time.sleep(.05)
   assert status==200 and not session['authenticated'];token=session['csrf']
+  assert call(anon,'/ads.txt')[0]==404
+  assert call(anon,'/ads.txt',{})[0]==405
   assert 'HttpOnly' in head['Set-Cookie'] and 'SameSite=Strict' in head['Set-Cookie']
   assert call(a,'/api/login',{'password':password})[0]==403
   assert call(a,'/api/login',{'password':password},token,{'Origin':'https://other.invalid'})[0]==403

@@ -2,6 +2,13 @@
 declare(strict_types=1);
 namespace Chronicle;
 final class Ads {
+    public static function sellers(array $config):?string {
+        $client=$config['adsense']['client']??null;
+        if(($config['public_indexing']??false)!==true||($config['local_test']??false)===true
+            ||!is_string($client)||preg_match('/^ca-(pub-[0-9]{16})$/D',$client,$match)!==1)return null;
+        // Seller authorization is independent of temporarily disabling ad delivery.
+        return 'google.com, '.$match[1].", DIRECT, f08c47fec0942fa0\n";
+    }
     public static function enabled(array $config,bool $public):bool {
         $a=$config['adsense']??[];
         return $public&&($config['public_indexing']??false)===true&&($config['local_test']??false)!==true

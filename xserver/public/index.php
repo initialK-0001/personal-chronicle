@@ -11,6 +11,11 @@ try {
     header('X-Robots-Tag: noindex, nofollow');
     $comments=new Chronicle\Comments($store,$legacy,$config['rate_secret']);
     $path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);$method=$_SERVER['REQUEST_METHOD'];
+    if($path==='/ads.txt'){
+        if(!in_array($method,['GET','HEAD'],true)){header('Allow: GET, HEAD');throw new Chronicle\Failure('未対応の操作です',405);}
+        $sellers=Chronicle\Ads::sellers($config);if($sellers===null)throw new Chronicle\Failure('見つかりません',404);
+        header('Content-Type: text/plain; charset=UTF-8');if($method==='GET')echo $sellers;exit;
+    }
     if($path==='/api/public/comments'&&$method==='GET')respond(['comments'=>$comments->published(is_string($_GET['post']??null)?$_GET['post']:'')]);
     if($path==='/api/public/posts'){
         if($method!=='GET')throw new Chronicle\Failure('未対応の操作です',405);
