@@ -192,3 +192,13 @@ Cronは実行後OFFを確認。結果ファイル・合成データのバック�
 `private/posts-import.json` と `private/legacy-media-manifest.json` は非公開保存。新画像用imagesとsessionsを700で作成。管理者パスワード入力用 `private/admin-password.txt` は空の600。`configure-server.php` は配置済みだが未実行。利用者がDBとは別の管理用パスワードを入力した後 ハッシュ・ランダムrate_secret・本番origin・非公開フラグを含むconfig.jsonを600で作成し平文入力ファイルを削除する。パスワードは12〜72バイト 本文をチャットに貼らない。設定は存在すれば上書きしない。
 
 確認：PHP抽出テスト（SQL式拒否 文字列保持 原本ハッシュ 日時 サムネイル コメント以外の設定除外 配布ファイル）成功 Python WordPress関連6件成功 実SQLの全件比較成功 PHP構文確認成功。configure-serverの本番実行・管理ログイン・実HTTP確認はまだ行っていない。全WordPressシステムの外部復元試験や本番切替まで完了したという意味ではない。
+
+## 2026-11-16 12:54 JST 管理者認証の初期設定完了
+
+利用者が非公開admin-password.txtへ入力・更新した後 configure-server.phpをPHP8.3 CLIで一度実行。サーバー内だけでpassword_hashとpassword_verifyを行い config.jsonを公開領域外のprivateフォルダへ権限600で新規作成。実アプリbootstrapで専用MySQLへ接続し sessions/images/legacy-uploadsの存在と書込み可否を確認。値・平文・ハッシュはモデルの出力やGitHubへ保存していない。
+
+configuration-result.jsonは2026-11-16T03:54:01Z success=true configuration_private=true plaintext_admin_password_removed=true database_connected=true。ファイル一覧でconfig.json 600とadmin-password.txtが存在しないことを確認。CronはOFFに戻し停止表示を確認。
+
+現在の設定はorigin=https://brand-new.tokyo legacy_public_enabled=false public_indexing=false adsense.enabled=false。本番公開入口へは未配置。DB用のdatabase.php/db-password.txtは非公開600で保持。今回削除したのは管理者パスワードの一時入力ファイルのみ。
+
+これは初期設定とCLI接続確認であり 実HTTPSのログイン・Cookie/セッション・画像アップロード確認ではない。次は公開用入口と復旧用入口の具体化 実HTTPSでの確認 最新差分と広告の確認 本番切替の承認。WordPress・PHP設定・DNSは未変更。追加パスワード入力は現時点で不要。

@@ -5,13 +5,13 @@
 | 項目 | 現状 | 切替までに必要な確認 |
 | --- | --- | --- |
 | 投稿と下書き | PHP保存・公開・非公開・競合をHTTP試験済み 本文の画面操作は引継ぎ確認記録あり | 現版の実ホスト保存・管理画面確認 画像操作 |
-| 画像 | 非公開保存・公開参照制御・JPEG全8方向補正を試験済み | 実機アップロードと実ホストのメモリ上限確認 |
+| 画像 | 旧7161ファイルを非公開コピーし原本ハッシュ一致 非公開保存・公開参照制御・JPEG全8方向補正を試験済み | 実機アップロードと実ホストのメモリ上限確認 |
 | コメント | 名前任意・承認・削除・承認済みへの返信を実装 | 承認・返信ボタンは引継ぎ確認記録あり 現版の実ホスト確認と最新DB差分 既存バックアップの旧コメントは0件 |
 | 旧URL | 台帳207件を独立PHP環境のHTTPで確認 192記事・固定ページ 14カテゴリー トップ | 実ホストHTTPでの一括照合 添付・配布URLの実取得 |
-| 旧記事表示 | 原文保全・安全なHTML表示・同一URLの編集と公開分離を実装 | 編集画面の実ブラウザー確認 改行や装飾の見た目 地図はリンク置換済み 問い合わせの管理画面確認 |
+| 旧記事表示 | 実MySQLへ388件取込・全項目一致 原文保全・安全なHTML表示・同一URL編集と公開分離を実装 | 編集画面の実ブラウザー確認 改行や装飾の見た目 地図はリンク置換済み 問い合わせの管理画面確認 |
 | 検索エンジン向け出力 | 新投稿と一覧のSSR 正規URL サイトマップ robotsを実装 | 切替時にpublic_indexingを有効化 開発URLは有効化しない |
 | 広告 | AmazonJS保持 AdSense広告枠抽出 本文後配置・対応CSPを実装 | AdSenseアカウントの自動広告・同意画面設定 実配信 CSP実動作 ポリシー内容の実運用との照合 |
-| 復旧 | 新サイトの独立DB・画像復元をSQLiteで試験済み | 実MySQLで復元 旧WordPress全体の独立バックアップと戻し確認 |
+| 復旧 | SQLite復元と実MySQLで合成投稿・コメントの復元を確認 | 実データを含む復元 旧WordPress全体の独立バックアップと戻し確認 |
 | PHP | 8.3以上を使用する方針に合意済み 開発は8.4 | 実ホストで新サイトを検証したうえで本番変更 |
 
 ## 本番操作の順序
@@ -94,3 +94,13 @@ Cronは実行後OFFを確認。結果ファイル・合成データのバック�
 `private/posts-import.json` と `private/legacy-media-manifest.json` は非公開保存。新画像用imagesとsessionsを700で作成。管理者パスワード入力用 `private/admin-password.txt` は空の600。`configure-server.php` は配置済みだが未実行。利用者がDBとは別の管理用パスワードを入力した後 ハッシュ・ランダムrate_secret・本番origin・非公開フラグを含むconfig.jsonを600で作成し平文入力ファイルを削除する。パスワードは12〜72バイト 本文をチャットに貼らない。設定は存在すれば上書きしない。
 
 確認：PHP抽出テスト（SQL式拒否 文字列保持 原本ハッシュ 日時 サムネイル コメント以外の設定除外 配布ファイル）成功 Python WordPress関連6件成功 実SQLの全件比較成功 PHP構文確認成功。configure-serverの本番実行・管理ログイン・実HTTP確認はまだ行っていない。全WordPressシステムの外部復元試験や本番切替まで完了したという意味ではない。
+
+## 2026-11-16 12:54 JST 管理者認証の初期設定完了
+
+利用者が非公開admin-password.txtへ入力・更新した後 configure-server.phpをPHP8.3 CLIで一度実行。サーバー内だけでpassword_hashとpassword_verifyを行い config.jsonを公開領域外のprivateフォルダへ権限600で新規作成。実アプリbootstrapで専用MySQLへ接続し sessions/images/legacy-uploadsの存在と書込み可否を確認。値・平文・ハッシュはモデルの出力やGitHubへ保存していない。
+
+configuration-result.jsonは2026-11-16T03:54:01Z success=true configuration_private=true plaintext_admin_password_removed=true database_connected=true。ファイル一覧でconfig.json 600とadmin-password.txtが存在しないことを確認。CronはOFFに戻し停止表示を確認。
+
+現在の設定はorigin=https://brand-new.tokyo legacy_public_enabled=false public_indexing=false adsense.enabled=false。本番公開入口へは未配置。DB用のdatabase.php/db-password.txtは非公開600で保持。今回削除したのは管理者パスワードの一時入力ファイルのみ。
+
+これは初期設定とCLI接続確認であり 実HTTPSのログイン・Cookie/セッション・画像アップロード確認ではない。次は公開用入口と復旧用入口の具体化 実HTTPSでの確認 最新差分と広告の確認 本番切替の承認。WordPress・PHP設定・DNSは未変更。追加パスワード入力は現時点で不要。
