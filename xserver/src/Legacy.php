@@ -5,11 +5,11 @@ require_once __DIR__.'/../vendor/autoload.php';
 final class Legacy {
     private Store $store;private bool $enabled;private string $amazonTag;
     public function __construct(Store $store,bool $enabled,string $amazonTag=""){$this->store=$store;$this->enabled=$enabled;$this->amazonTag=preg_match("/^[A-Za-z0-9_-]{1,100}$/D",$amazonTag)?$amazonTag:"";}
-    public function records():array{
+    public function records(?string $path=null):array{
         if(!$this->enabled)return [];
-        $out=[];foreach($this->store->db->query("SELECT i.original_json,e.legacy_id AS edited,e.visibility,e.snapshot_json,e.published_at,e.updated_at FROM chronicle_imports i LEFT JOIN chronicle_legacy_edits e ON e.legacy_id=i.legacy_id")->fetchAll() as $row){
+        $out=[];$query=$this->store->db->prepare("SELECT i.original_json,e.legacy_id AS edited,e.visibility,e.snapshot_json,e.published_at,e.updated_at FROM chronicle_imports i LEFT JOIN chronicle_legacy_edits e ON e.legacy_id=i.legacy_id".($path!==null?" WHERE i.legacy_path=? OR LOWER(i.legacy_path)=LOWER(?)":""));$query->execute($path!==null?[$path,implode('/',array_map('rawurlencode',explode('/',$path)))]:[]);while($row=$query->fetch()){
             $r=json_decode($row['original_json'],true,512,JSON_THROW_ON_ERROR);
-            if($row['edited']!==null){if($row['visibility']!=='public')continue;if($row['snapshot_json']!==null){$p=json_decode($row['snapshot_json'],true,512,JSON_THROW_ON_ERROR);$r['title']=$p['title'];if(array_key_exists('thumbnail',$p))$r['thumbnail']=$p['thumbnail'];$r['original_html']=$p['html'];$r['published_at']=$r['published_at']??$row['published_at'];$r['updated_at']=$row['updated_at'];}}
+            if($row['edited']!==null){if($row['visibility']!=='public')continue;if($row['snapshot_json']!==null){$p=json_decode($row['snapshot_json'],true,512,JSON_THROW_ON_ERROR);unset($r['archive_preview']);$r['title']=$p['title'];if(array_key_exists('thumbnail',$p))$r['thumbnail']=$p['thumbnail'];$r['original_html']=$p['html'];$r['published_at']=$r['published_at']??$row['published_at'];$r['updated_at']=$row['updated_at'];}}
             elseif($r['status']!=='publish'||($r['original_record']['post_password']??'')!=='')continue;
             $out[]=$r;
         }return $out;
@@ -18,7 +18,7 @@ final class Legacy {
         $out=[];foreach($this->records() as $r)foreach($r['terms']??[] as $t)if(($t['taxonomy']??'')==='category'){$slug=rawurldecode($t['slug']);$out[$slug]=['path'=>'/category/'.$slug,'name'=>$t['name']];}return array_values($out);
     }
     public function category(string $path):?array{foreach($this->categories() as $c)if(rtrim(rawurldecode($path),'/')===$c['path'])return $c;return null;}
-    public function find(string $path):?array{foreach($this->records() as $r)if(rtrim(rawurldecode($r['path']),'/')===rtrim(rawurldecode($path),'/'))return $r;return null;}
+    public function find(string $path):?array{foreach($this->records(rtrim(rawurldecode($path),'/')) as $r)if(rtrim(rawurldecode($r['path']),'/')===rtrim(rawurldecode($path),'/'))return $r;return null;}
     public static function localUrl(string $url):string {
         $u=parse_url($url);
         if($u===false||($u['host']??'')!=='brand-new.tokyo'||!in_array($u['scheme']??'https',['http','https'],true)||isset($u['port'])||isset($u['user'])||isset($u['pass']))return $url;
@@ -46,7 +46,9 @@ final class Legacy {
         },$safe);
     }
     public function posts():array{
-        $out=[];foreach($this->records() as $r){if($r['type']!=='post')continue;$html=str_replace('/api/images/','/api/public/images/',$this->html($r['original_html']));$blocks=[];
+        $out=[];foreach($this->records() as $r){if($r['type']!=='post')continue;
+            if(isset($r['archive_preview'])){$preview=$r['archive_preview'];$blocks=[];if($preview['thumbnail'])$blocks[]=['type'=>'image','src'=>$preview['thumbnail'],'alt'=>''];$blocks[]=['type'=>'paragraph','text'=>$preview['text']];$out[]=['id'=>'legacy-'.$r['legacy_id'],'url'=>$r['path'],'title'=>$r['title'],'tags'=>array_column($r['terms'],'name'),'date'=>$r['published_at'],'updatedAt'=>$r['updated_at'],'blocks'=>$blocks];continue;}
+            $html=str_replace('/api/images/','/api/public/images/',$this->html($r['original_html']));$blocks=[];
             $thumb=isset($r['thumbnail'])?str_replace('/api/images/','/api/public/images/',self::localUrl($r['thumbnail'])):null;
             if(!$thumb&&preg_match('/<img[^>]+src="([^"]+)"/',$html,$m))$thumb=html_entity_decode($m[1],ENT_QUOTES,'UTF-8');
             if($thumb)$blocks[]=['type'=>'image','src'=>$thumb,'alt'=>''];

@@ -36,7 +36,7 @@ final class Web {
         }else{
             if($theme!=='')$posts=array_values(array_filter($posts,fn($p)=>in_array($theme,$p['tags'],true)));
             usort($posts,fn($a,$b)=>strcmp($b['date']??'',$a['date']??''));
-            $html=str_replace('<section id="feed" class="feed" aria-label="タイムライン"></section>','<section id="feed" class="feed timeline" aria-label="タイムライン">'.implode('',array_map([self::class,'card'],$posts)).'</section>',$html);
+            $html=str_replace('<section id="feed" class="feed" aria-label="タイムライン"></section>','<section id="feed" class="feed timeline" aria-label="タイムライン">'.implode('',array_map([self::class,'card'],array_slice($posts,0,50))).'</section>',$html);
         }
         // Category callers supply their own canonical route after rendering.
         if($theme==='')$html=str_replace('</head>','<link rel="canonical" href="'.self::escape(rtrim($origin,'/').$path).'"></head>',$html);

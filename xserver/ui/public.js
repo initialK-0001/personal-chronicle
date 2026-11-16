@@ -8,14 +8,15 @@ const id=()=>crypto.randomUUID();
 const textBlock=text=>({id:id(),type:'paragraph',text});
 const imgBlock=(src,alt)=>({id:id(),type:'image',src,alt});
 
-let loading=true,loadError=false;
+let loading=true,loadError=false,visibleLimit=50,lastFilter='';
 let state={posts:[]},view='all',search='',tag='';
 const prose=p=>p.blocks.filter(b=>b.type==='paragraph'||b.type==='quote').map(b=>b.text).join('\n');
 const dateLabel=p=>p.date?esc(new Date(p.date).toLocaleDateString('ja-JP',{timeZone:'Asia/Tokyo'})):'';
 const allPosts=()=>[...state.posts,...samples.filter(p=>!state.posts.some(saved=>saved.id===p.id))];
 function filtered(){const pool=new URLSearchParams(location.search).has('works')?allPosts().filter(collectionEligible):allPosts();return pool.filter(p=>(view!=='images'||p.blocks.some(b=>b.type==='image'))&&(view!=='articles'||(prose(p).trim()&&!p.blocks.some(b=>b.type==='image')))&&(!tag||p.tags.includes(tag))&&(!search||[p.title,prose(p),...p.tags].join(' ').toLowerCase().includes(search.toLowerCase()))).sort((a,b)=>(b.date||'').localeCompare(a.date||''));}
-function render(){const posts=filtered();$('#feed').className='feed timeline';$('#empty').hidden=!!posts.length;$('#pageTitle').textContent=search?'検索結果':tag||'タイムライン';$('#activeFilters').innerHTML=[search?`<span>検索 ${esc(search)}</span>`:'',tag?`<span>${esc(tag)}</span>`:'',(tag||search)?'<button id="resetSearch">条件を解除</button>':''].join('');$('#resetSearch')?.addEventListener('click',clearFilters);
-$('#feed').innerHTML=posts.map(p=>timelineHTML(p,postURL(p),false)).join('');
+function render(){const filterKey=JSON.stringify([view,search,tag]);if(filterKey!==lastFilter){visibleLimit=50;lastFilter=filterKey;}const posts=filtered();$('#feed').className='feed timeline';$('#empty').hidden=!!posts.length;$('#pageTitle').textContent=search?'検索結果':tag||'タイムライン';$('#activeFilters').innerHTML=[search?`<span>検索 ${esc(search)}</span>`:'',tag?`<span>${esc(tag)}</span>`:'',(tag||search)?'<button id="resetSearch">条件を解除</button>':''].join('');$('#resetSearch')?.addEventListener('click',clearFilters);
+$('#feed').innerHTML=posts.slice(0,visibleLimit).map(p=>timelineHTML(p,postURL(p),false)).join('');
+let more=$('#loadMorePosts');if(!more){more=document.createElement('button');more.id='loadMorePosts';more.textContent='さらに表示';$('#feed').after(more);}more.hidden=posts.length<=visibleLimit||new URLSearchParams(location.search).has('post');more.onclick=()=>{visibleLimit+=50;render();};
  $$('#feed [data-destination]').forEach(el=>el.onclick=e=>{if(!e.target.closest('a,button')&&!window.getSelection()?.toString())location.href=el.dataset.destination;});
  $$('#feed [data-edit]').forEach(el=>el.onclick=()=>editPost(allPosts().find(p=>p.id===el.dataset.edit)));
  renderPage();
