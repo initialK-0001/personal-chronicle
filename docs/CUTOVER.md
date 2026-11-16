@@ -126,3 +126,16 @@ configuration-result.jsonは2026-11-16T03:54:01Z success=true configuration_priv
 public-nextを実際にWebサーバーで使用していないため ApacheのRewrite/HTTPS/PHP実行・.user.ini反映は未確認。フォルダ入替の自動実行コードもまだ用意していない。candidate/index.phpは前案の参考ファイルで使用しない public-next/index.phpを現行候補とする。
 
 公式確認先：.htaccess上書きによりPHPバージョンへ影響しうる https://www.xserver.ne.jp/support/faq/service_php_rewrite_version.php 。キャッシュ除外条件 https://www.xserver.ne.jp/manual/man_server_cache.php 。本番での実レスポンス確認は別途必要。
+
+## 2026-11-16 13:16 JST 現行サイトとの差分照合
+
+check-live-delta.phpは現行wp-config.phpのDB接続定数だけをtoken_get_allでリテラル解析し WordPressを実行せず接続。接続先DBをmay231754_brandnewtokyoへ限定しSET TRANSACTION READ ONLYで開始 SELECTだけを行い最後にROLLBACK。認証情報はレポートに出さない。
+
+記事388件の元レコード全フィールド 分類 サムネイルを比較し追加0変更0削除0。コメント0件 配布情報36件一致。現行uploadsの移行対象7161ファイルをサイズとSHA-256で比較し変更0欠落0。対象の年別ディレクトリとposes/pictures/download-manager-filesを走査し追加0。結果live-delta.json success=true content_unchanged=true wordpress_modified=false（13:16:01〜13:16:10 JST）。Cron OFFを確認。
+
+同じ読取専用接続で現行Cocoon共通レスポンシブ広告枠を一意特定 AmazonJSのassociateTagJPを形式検証。private/advertising-candidate.jsonへ権限600で識別子のみ保存。AmazonのaccessKeyId/secretAccessKeyを転記していない。現在のconfig.jsonにはまだ統合していない。enabled/account_settings_verifiedはfalseのままで 広告配信やAdSenseアカウント側の確認を完了したとは扱わない。
+
+構文確認と保存済みSQLを使った広告抽出の事前照合を実施。原本・現行WordPress・現行DBには書込みを行っていない。照合後の更新は自動追従しないため実切替が後日になれば再照合が必要。再実行時は結果と候補ファイルの上書き禁止ガードに従い別実行先を用意する。
+
+### AdSense確認の保留（2026-11-16）
+ログイン済みアカウントを開いたところ 更新された利用規約への同意が要求された。同意操作は行わず ユーザー確認待ち。自動広告・同意設定を確認できたとは扱わない。新サイトの広告設定は引き続き無効。WordPress・公開フォルダ・PHPバージョンは変更していない。

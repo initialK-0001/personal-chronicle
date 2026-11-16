@@ -212,3 +212,13 @@ server-http-check.phpが実サーバー上のPHP8.3内蔵HTTPサーバーを127.
 結果13:07 JST：公開URL207件が200 text/html noindex。管理画面は303 管理APIは401 開発サイトマップは404。旧private/draftのうち非空かつ公開記事と同一パスでない174件は404。空パス等を含む全196件を個別URLとして確認したという意味ではない。投稿・コメント・公開設定の更新は行っていない。確認サーバーを終了し結果server-http-check.json success=trueを確認 Cron OFFを確認。
 
 未確認：外部HTTPS Apache/nginxのRewrite・キャッシュ PHP-FPM/CGIの挙動 ログインのブラウザー操作 全画像・配布のHTTP取得 最新WordPress差分 広告のアカウント設定。今回の内部HTTP成功を本番切替完了と扱わない。秘密設定・セッション・ログの一時コピーは非公開フォルダhttp-check-*に保持しGitへ含めない。
+
+## 2026-11-16 13:16 JST 現行サイトとの差分照合
+
+check-live-delta.phpは現行wp-config.phpのDB接続定数だけをtoken_get_allでリテラル解析し WordPressを実行せず接続。接続先DBをmay231754_brandnewtokyoへ限定しSET TRANSACTION READ ONLYで開始 SELECTだけを行い最後にROLLBACK。認証情報はレポートに出さない。
+
+記事388件の元レコード全フィールド 分類 サムネイルを比較し追加0変更0削除0。コメント0件 配布情報36件一致。現行uploadsの移行対象7161ファイルをサイズとSHA-256で比較し変更0欠落0。対象の年別ディレクトリとposes/pictures/download-manager-filesを走査し追加0。結果live-delta.json success=true content_unchanged=true wordpress_modified=false（13:16:01〜13:16:10 JST）。Cron OFFを確認。
+
+同じ読取専用接続で現行Cocoon共通レスポンシブ広告枠を一意特定 AmazonJSのassociateTagJPを形式検証。private/advertising-candidate.jsonへ権限600で識別子のみ保存。AmazonのaccessKeyId/secretAccessKeyを転記していない。現在のconfig.jsonにはまだ統合していない。enabled/account_settings_verifiedはfalseのままで 広告配信やAdSenseアカウント側の確認を完了したとは扱わない。
+
+構文確認と保存済みSQLを使った広告抽出の事前照合を実施。原本・現行WordPress・現行DBには書込みを行っていない。照合後の更新は自動追従しないため実切替が後日になれば再照合が必要。再実行時は結果と候補ファイルの上書き禁止ガードに従い別実行先を用意する。
