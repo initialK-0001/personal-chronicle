@@ -16,7 +16,8 @@ final class Auth {
     public function loggedIn():bool{return ($_SESSION['admin']??false)===true&&($_SESSION['expires']??0)>=time();}
     public function guard():void{if(!$this->loggedIn())throw new Failure('ログインしてください',401);}
     public function mutation():void{
-        if(($_SERVER['HTTP_ORIGIN']??'')!==$this->config['origin']||!hash_equals($_SESSION['csrf'],$_SERVER['HTTP_X_CSRF_TOKEN']??''))throw new Failure('この画面から操作してください',403);
+        if(($_SERVER['HTTP_ORIGIN']??'')!==$this->config['origin'])throw new Failure('操作元のURLを確認できません 正規の管理画面を開き直してください',403);
+        if(!hash_equals($_SESSION['csrf'],$_SERVER['HTTP_X_CSRF_TOKEN']??''))throw new Failure('画面の認証情報が古くなっています 再読み込みしてください',403);
     }
     public function login(string $password):void{
         $bucket=hash_hmac('sha256',($_SERVER['REMOTE_ADDR']??'unknown').':'.intdiv(time(),900),$this->config['rate_secret']);

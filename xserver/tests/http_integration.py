@@ -33,6 +33,14 @@ with tempfile.TemporaryDirectory() as tmp:
   status,data,_=call(a,'/api/login',{'password':password},token);assert status==200;token=data['csrf']
   assert call(anon,'/api/admin/posts/1',headers={'oai-authenticated-user-id':'owner'})[0]==401
   doc={'title':'','tags':[],'blocks':[{'type':'paragraph','text':'初版'}]}
+  stale_token=token
+  token=call(a,'/api/login',{'password':password},token)[1]['csrf']
+  status,stale,_=call(a,'/api/admin/posts',doc,stale_token)
+  assert status==403 and stale['error']=='画面の認証情報が古くなっています 再読み込みしてください'
+  assert call(a,'/api/state')[1]['state']['posts']==[]
+  token=call(a,'/api/session')[1]['csrf']
+  assert call(a,'/api/admin/posts',doc,token,{'Origin':'https://other.invalid'})[0]==403
+  assert call(a,'/api/state')[1]['state']['posts']==[]
   status,data,_=call(a,'/api/admin/posts',doc,token);assert status==201;id=data['post']['id']
   assert call(anon,'/api/public/posts')[1]['posts']==[]
   assert call(a,f'/api/admin/posts/{id}',{'action':'release','revision':1},token)[0]==200

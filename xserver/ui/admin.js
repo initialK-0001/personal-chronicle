@@ -1,4 +1,4 @@
-let csrf='';const session=await fetch('/api/session').then(r=>r.json());if(!session.authenticated)location.href='/login';csrf=session.csrf;
+let csrf='';const session=await fetch('/api/session',{cache:'no-store'}).then(r=>r.json());if(!session.authenticated)location.href='/login';csrf=session.csrf;
 const samples=[];
 import {timelineHTML,collectionEligible} from './timeline.js';
 'use strict';
@@ -13,7 +13,19 @@ const message=t=>{$('#toast').textContent=t;$('#toast').hidden=false;clearTimeou
 const prose=p=>p.blocks.filter(b=>b.type==='paragraph'||b.type==='quote').map(b=>b.text).join('\n');
 const dateLabel=p=>p.date?esc(new Date(p.date).toLocaleDateString('ja-JP',{timeZone:'Asia/Tokyo'})):'';
 const allPosts=()=>[...(view==='trash'?(state.trash||[]):state.posts),...samples.filter(p=>!state.posts.some(saved=>saved.id===p.id))];
-async function requestAPI(path,options={}){const r=await fetch(path,{...options,cache:'no-store',headers:{'X-CSRF-Token':csrf,...(options.headers||{})}});let data;try{data=await r.json();}catch{throw Error('サーバーに接続できません');}if(!r.ok){if(r.status===409)conflict=true;throw Error(data.error||'保存できません');}return data;}
+let sessionRefresh=null;
+async function refreshAdminSession(){
+ if(!sessionRefresh)sessionRefresh=(async()=>{const r=await fetch('/api/session',{cache:'no-store'});if(!r.ok)throw Error('認証情報を更新できません もう一度お試しください');const current=await r.json();if(!current.authenticated)throw Error('ログインの有効期限が切れています 別のタブでログインしてからもう一度操作してください');csrf=current.csrf;})().finally(()=>{sessionRefresh=null;});
+ return sessionRefresh;
+}
+async function requestAPI(path,options={},retried=false){
+ const r=await fetch(path,{...options,cache:'no-store',headers:{'X-CSRF-Token':csrf,...(options.headers||{})}});
+ let data;try{data=await r.json();}catch{throw Error('サーバーに接続できません');}
+ // This 403 is returned before mutation dispatch. Retry only once after refreshing the token.
+ if(r.status===403&&data.error==='画面の認証情報が古くなっています 再読み込みしてください'&&!retried){await refreshAdminSession();return requestAPI(path,options,true);}
+ if(!r.ok){if(r.status===409)conflict=true;if(r.status===401)throw Error('ログインの有効期限が切れています 別のタブでログインしてからもう一度操作してください');throw Error(data.error||'保存できません');}
+ return data;
+}
 function persist(action='draft',post=editing,postId){
  clearTimeout(saveTimer);if(!ready||conflict)return Promise.reject(Error(conflict?'別の端末で変更されています 入力を書き出してから読み直してください':'保存先に接続できません'));
  dirty=true;$('#saveState').textContent='保存中';const snapshot=post?structuredClone(post):null,version=editVersion;
