@@ -7,6 +7,7 @@ function serveHTML(string $html,bool $public=false):void{global $config,$legacy;
 function respond($data,int $status=200):void{http_response_code($status);echo Chronicle\Store::json($data);exit;}
 try {
     [$store,$config]=chronicle_boot();
+    $works=new Chronicle\Works($store);
     $legacy=new Chronicle\Legacy($store,($config['legacy_public_enabled']??false)===true,$config['legacy_amazon_tag']??'');
     header('X-Robots-Tag: noindex, nofollow');
     $comments=new Chronicle\Comments($store,$legacy,$config['rate_secret']);
@@ -16,6 +17,8 @@ try {
         $sellers=Chronicle\Ads::sellers($config);if($sellers===null)throw new Chronicle\Failure('見つかりません',404);
         header('Content-Type: text/plain; charset=UTF-8');if($method==='GET')echo $sellers;exit;
     }
+    if($method==='GET'&&($path==='/works'||preg_match('~^/works/([1-9][0-9]*)$~D',$path,$wm)))serveHTML($works->page($path==='/works'?null:(int)$wm[1],array_merge($store->publicPosts(),$legacy->posts()),$config['origin']),true);
+    if($path==='/api/public/works'&&$method==='GET')respond(['works'=>$works->published(array_merge($store->publicPosts(),$legacy->posts()))]);
     if($path==='/api/public/comments'&&$method==='GET')respond(['comments'=>$comments->published(is_string($_GET['post']??null)?$_GET['post']:'')]);
     if($path==='/api/public/posts'){
         if($method!=='GET')throw new Chronicle\Failure('未対応の操作です',405);
@@ -26,7 +29,7 @@ try {
     $publicAssets=['/style.css'=>'text/css','/timeline.js'=>'text/javascript','/public.js'=>'text/javascript','/login.js'=>'text/javascript','/comments.js'=>'text/javascript','/contact.js'=>'text/javascript'];
     if($method==='GET'&&isset($publicAssets[$path])){header('Content-Type: '.$publicAssets[$path]);readfile(__DIR__.'/../ui'.$path);exit;}
     if($method==='GET'&&$path==='/robots.txt'){header('Content-Type: text/plain; charset=UTF-8');echo ($config['public_indexing']??false)===true?"User-agent: *\nDisallow: /admin\nDisallow: /api/\nDisallow: /login\nSitemap: ".$config['origin']."/sitemap.xml\n":"User-agent: *\nDisallow: /\n";exit;}
-    if($method==='GET'&&$path==='/sitemap.xml'){if(($config['public_indexing']??false)!==true)throw new Chronicle\Failure('見つかりません',404);header('Content-Type: application/xml; charset=UTF-8');echo Chronicle\Web::sitemap($config['origin'],$store->publicPosts(),$legacy);exit;}
+    if($method==='GET'&&$path==='/sitemap.xml'){if(($config['public_indexing']??false)!==true)throw new Chronicle\Failure('見つかりません',404);header('Content-Type: application/xml; charset=UTF-8');echo Chronicle\Web::sitemap($config['origin'],$store->publicPosts(),$legacy,$works->published(array_merge($store->publicPosts(),$legacy->posts())));exit;}
     if($method==='GET'&&$path==='/login')serveHTML(file_get_contents(__DIR__.'/../ui/login.html'));
     if($method==='GET'&&$path==='/'){
         if(isset($_GET['wpdmdl']))$legacy->download((int)$_GET['wpdmdl'],$config['legacy_uploads']??'');
@@ -40,7 +43,7 @@ try {
     }
     if($method==='GET'&&($r=$legacy->find($path))){$html=$legacy->page($r);$html=str_replace('</head>','<link rel="canonical" href="'.Chronicle\Web::escape(Chronicle\Web::url($config['origin'],$r['path'])).'"></head>',$html);serveHTML($html,true);}
     if($method==='GET'&&($category=$legacy->category($path))){$html=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($store->publicPosts(),$legacy->posts()),$config['origin'],null,$category['name']);$html=str_replace('</head>','<link rel="canonical" href="'.Chronicle\Web::escape(Chronicle\Web::url($config['origin'],$category['path'])).'"></head>',$html);serveHTML($html,true);}
-    if(!str_starts_with($path,'/api/')&&!str_starts_with($path,'/admin')&&!in_array($path,['/comments-admin.js','/legacy-admin.js','/contact-admin.js'],true))throw new Chronicle\Failure('見つかりません',404);
+    if(!str_starts_with($path,'/api/')&&!str_starts_with($path,'/admin')&&!in_array($path,['/comments-admin.js','/legacy-admin.js','/contact-admin.js','/works-admin.js'],true))throw new Chronicle\Failure('見つかりません',404);
     $auth=new Chronicle\Auth($store,$config);$auth->start();
     if($path==='/api/session'&&$method==='GET')respond(['authenticated'=>$auth->loggedIn(),'csrf'=>$_SESSION['csrf']]);
     if($method!=='GET')$auth->mutation();
@@ -55,8 +58,20 @@ try {
     $contact=new Chronicle\Contact($store,$config['rate_secret'],$legacy->find('/contact-form')!==null);
     if($path==='/api/public/contact'&&$method==='POST'){$contact->submit($input,$_SERVER['REMOTE_ADDR']??'unknown');respond(['received'=>true],202);}
     if($path==='/api/public/comments'&&$method==='POST'){$comments->submit($input,$_SERVER['REMOTE_ADDR']??'unknown');respond(['received'=>true],202);}
-    if(in_array($path,['/admin','/admin.html','/admin/comments','/admin/legacy-edit','/admin/contact'],true)&&!$auth->loggedIn()){header('Location: /login',true,303);exit;}
+    if(in_array($path,['/admin','/admin.html','/admin/comments','/admin/legacy-edit','/admin/contact','/admin/works'],true)&&!$auth->loggedIn()){header('Location: /login',true,303);exit;}
     $auth->guard();
+    if($path==='/admin/works'&&$method==='GET')serveHTML(file_get_contents(__DIR__.'/../ui/works-admin.html'));
+    if($path==='/works-admin.js'&&$method==='GET'){header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/works-admin.js');exit;}
+    if($path==='/api/admin/works'&&$method==='GET')respond(['works'=>$works->rows(),'posts'=>array_merge($store->state()['state']['posts'],(new Chronicle\Legacy($store,true))->posts())]);
+    if($path==='/api/admin/works'&&$method==='POST'){
+        if(isset($input['parent_id'])&&!is_int($input['parent_id']))throw new Chronicle\Failure('作品を確認してください');
+        respond(['work'=>$works->create($input['parent_id']??null,$input['content']??[])],201);
+    }
+    if(preg_match('~^/api/admin/works/([1-9][0-9]*)$~D',$path,$wm)&&$method==='POST'){
+        if(!is_int($input['revision']??null)||!is_string($input['action']??null)||isset($input['content'])&&!is_array($input['content']))throw new Chronicle\Failure('入力内容を確認してください');
+        respond(['work'=>$works->change((int)$wm[1],$input['revision'],$input['action'],$input['content']??null)]);
+    }
+
     if($path==='/admin/contact'&&$method==='GET')serveHTML(file_get_contents(__DIR__.'/../ui/contact-admin.html'));
     if($path==='/contact-admin.js'&&$method==='GET'){header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/contact-admin.js');exit;}
     if($path==='/api/admin/contact'&&$method==='GET')respond(['messages'=>$contact->listing()]);

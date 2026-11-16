@@ -11,6 +11,8 @@ final class Store {
     public PDO $db;
     public function __construct(PDO $db) {$this->db=$db;$db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);$db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE,PDO::FETCH_ASSOC);}
     public function initialize(): void {
+        require_once __DIR__.'/Works.php';
+        (new Works($this))->initialize();
         $mysql=$this->db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql';
         $id=$mysql?'BIGINT PRIMARY KEY AUTO_INCREMENT':'INTEGER PRIMARY KEY AUTOINCREMENT';
         $text=$mysql?'MEDIUMTEXT':'TEXT';
