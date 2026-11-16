@@ -10,3 +10,6 @@ $tpl=file_get_contents(__DIR__.'/../ui/index.html');$html=Web::page($tpl,[$p],'h
 $short=$p;$short['title']='';$short['blocks']=[['type'=>'paragraph','text'=>str_repeat('あ',140)]];check(!str_contains(Web::card($short),'続きを読む'),'140字は省略しない');$short['blocks'][0]['text'].='い';check(str_contains(Web::card($short),'続きを読む'),'141字は省略');check(!str_contains(Web::card($short),'<img'),'NoImageなし');
 $xml=Web::sitemap('https://example.test',[$p],$l);check(str_contains($xml,'/category/%E6%97%A7'),'サイトマップ分類');check(str_contains($xml,'https://example.test/old'),'旧URL');check(!str_contains($xml,'admin'),'管理URLを含めない');$dom=new DOMDocument();check($dom->loadXML($xml),'XMLとして妥当');
 echo "公開本文SSR・エスケープ・日本時間・カテゴリー・サイトマップの検証成功\n";
+$p['title']='';$p['blocks']=[['type'=>'paragraph','text'=>"先頭\n\n次行"],['type'=>'heading','text'=>'見出し']];
+check(str_contains(Web::card($p),'<p>先頭 次行 見出し</p>'),'一覧の改行と段落を空白にする');
+check(str_contains(Web::blocks($p['blocks']),"先頭\n\n次行"),'個別本文の改行は保持');
