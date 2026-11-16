@@ -26,3 +26,15 @@ $s->db->exec("UPDATE chronicle_legacy_edits SET published_at='2026-11-16T00:00:0
 check($legacy->find('/same-url')['published_at']===$r['published_at'],'旧記事は初出投稿日を優先');
 $listed=array_column($e->listing(),null,'id');check($listed[10]['firstPublishedAt']===$r['published_at'],'管理一覧も初出投稿日');
 $timeline=array_column($legacy->posts(),null,'id');check($timeline['legacy-10']['date']===$r['published_at'],'タイムラインの並び替え用日時は初出');
+
+$thumbHash=str_repeat('b',64);$thumb='/api/images/'.$thumbHash;
+$s->db->prepare('INSERT INTO chronicle_assets(hash,mime,bytes) VALUES(?,?,?)')->execute([$thumbHash,'image/png',10]);
+$rev=$e->one(10)['revision'];$e->change(10,$rev,'draft',['title'=>'サムネイル検証','html'=>'<p>本文</p>','thumbnail'=>$thumb]);
+check(!$legacy->referencesImage($thumbHash),'下書きサムネイルは非公開');
+$e->change(10,$rev+1,'release',null);check($legacy->referencesImage($thumbHash),'公開サムネイルだけの画像参照');
+$cards=array_column($legacy->posts(),null,'id');check($cards['legacy-10']['blocks'][0]['src']==='/api/public/images/'.$thumbHash,'公開サムネイル経路');
+$e->change(10,$rev+2,'draft',['title'=>'旧画面からの保存','html'=>'<p>本文更新</p>']);check($e->one(10)['draft']['thumbnail']===$thumb,'省略時は指定サムネイルを保持');
+$e->change(10,$rev+3,'draft',['title'=>'自動','html'=>'<img src="/wp-content/uploads/first.jpg">','thumbnail'=>null]);check($legacy->referencesImage($thumbHash),'自動への下書き中は公開サムネイルを維持');
+$e->change(10,$rev+4,'release',null);check(!$legacy->referencesImage($thumbHash),'公開解除済サムネイルを秘匿');$cards=array_column($legacy->posts(),null,'id');check($cards['legacy-10']['blocks'][0]['src']==='/wp-content/uploads/first.jpg','本文先頭画像へ変更');
+fails(fn()=>$e->change(10,$rev+5,'draft',['title'=>'不正','html'=>'本文','thumbnail'=>'https://example.org/a.png']),400);
+echo "サムネイルの下書き分離・公開参照・省略保持・本文先頭への切替を確認\n";

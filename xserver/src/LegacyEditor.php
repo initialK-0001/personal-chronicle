@@ -18,12 +18,12 @@ final class LegacyEditor {
     public function listing():array {
         $out=[];foreach($this->store->db->query('SELECT legacy_id FROM chronicle_imports ORDER BY legacy_id DESC')->fetchAll() as $r){$p=$this->one((int)$r['legacy_id']);$out[]=['id'=>$p['id'],'title'=>$p['draft']['title'],'visibility'=>$p['visibility'],'path'=>$p['path'],'firstPublishedAt'=>$p['postedAt']??$p['publishedAt'],'publishedAt'=>$p['publishedAt']??$p['postedAt'],'updatedAt'=>$p['updatedAt']];}return $out;
     }
-    public function editView(int $id):array {$p=$this->one($id);$p['html']=$this->legacy->html($p['draft']['html']);return $p;}
+    public function editView(int $id):array {$p=$this->one($id);$p['html']=$this->legacy->html($p['draft']['html']);$original=$this->original($id);$thumb=array_key_exists('thumbnail',$p['draft'])?$p['draft']['thumbnail']:($original['thumbnail']??null);if(!$thumb&&preg_match('/<img[^>]+src="([^"]+)"/',$p['html'],$m))$thumb=html_entity_decode($m[1],ENT_QUOTES,'UTF-8');$p['thumbnailSrc']=$thumb?Legacy::localUrl($thumb):null;return $p;}
     public function change(int $id,int $revision,string $action,?array $content):array {
         if(!in_array($action,['draft','release','unpublish'],true))throw new Failure('操作を確認してください');
-        if($content!==null){if(!is_string($content['title']??null)||strlen($content['title'])>2000||!is_string($content['html']??null)||strlen($content['html'])>900000)throw new Failure('本文を確認してください');$content=['title'=>$content['title'],'html'=>$content['html']];}
+        if($content!==null){if(!is_string($content['title']??null)||strlen($content['title'])>2000||!is_string($content['html']??null)||strlen($content['html'])>900000)throw new Failure('本文を確認してください');if(array_key_exists('thumbnail',$content)&&$content['thumbnail']!==null){if(!is_string($content['thumbnail'])||!preg_match('~^/api/images/([a-f0-9]{64})$~D',$content['thumbnail'],$match))throw new Failure('サムネイル画像を選び直してください');$q=$this->store->db->prepare('SELECT hash FROM chronicle_assets WHERE hash=?');$q->execute([$match[1]]);if(!$q->fetchColumn())throw new Failure('サムネイル画像を確認できません');}$content=array_intersect_key($content,array_flip(['title','html','thumbnail']));}
         if($action==='draft'&&$content===null)throw new Failure('本文を指定してください');
-        $baseline=$this->one($id);$db=$this->store->db;$db->beginTransaction();
+        $baseline=$this->one($id);if($content!==null&&!array_key_exists('thumbnail',$content)&&array_key_exists('thumbnail',$baseline['draft']))$content['thumbnail']=$baseline['draft']['thumbnail'];$db=$this->store->db;$db->beginTransaction();
         try{
             $sql=$db->getAttribute(\PDO::ATTR_DRIVER_NAME)==='mysql'?'INSERT IGNORE':'INSERT OR IGNORE';
             $q=$db->prepare($sql.' INTO chronicle_legacy_edits(legacy_id,revision,draft_json,snapshot_json,visibility,published_at,updated_at) VALUES(?,0,?,NULL,?,?,NULL)');

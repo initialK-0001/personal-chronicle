@@ -9,7 +9,7 @@ final class Legacy {
         if(!$this->enabled)return [];
         $out=[];foreach($this->store->db->query("SELECT i.original_json,e.legacy_id AS edited,e.visibility,e.snapshot_json,e.published_at,e.updated_at FROM chronicle_imports i LEFT JOIN chronicle_legacy_edits e ON e.legacy_id=i.legacy_id")->fetchAll() as $row){
             $r=json_decode($row['original_json'],true,512,JSON_THROW_ON_ERROR);
-            if($row['edited']!==null){if($row['visibility']!=='public')continue;if($row['snapshot_json']!==null){$p=json_decode($row['snapshot_json'],true,512,JSON_THROW_ON_ERROR);$r['title']=$p['title'];$r['original_html']=$p['html'];$r['published_at']=$r['published_at']??$row['published_at'];$r['updated_at']=$row['updated_at'];}}
+            if($row['edited']!==null){if($row['visibility']!=='public')continue;if($row['snapshot_json']!==null){$p=json_decode($row['snapshot_json'],true,512,JSON_THROW_ON_ERROR);$r['title']=$p['title'];if(array_key_exists('thumbnail',$p))$r['thumbnail']=$p['thumbnail'];$r['original_html']=$p['html'];$r['published_at']=$r['published_at']??$row['published_at'];$r['updated_at']=$row['updated_at'];}}
             elseif($r['status']!=='publish'||($r['original_record']['post_password']??'')!=='')continue;
             $out[]=$r;
         }return $out;
@@ -47,7 +47,7 @@ final class Legacy {
     }
     public function posts():array{
         $out=[];foreach($this->records() as $r){if($r['type']!=='post')continue;$html=str_replace('/api/images/','/api/public/images/',$this->html($r['original_html']));$blocks=[];
-            $thumb=isset($r['thumbnail'])?self::localUrl($r['thumbnail']):null;
+            $thumb=isset($r['thumbnail'])?str_replace('/api/images/','/api/public/images/',self::localUrl($r['thumbnail'])):null;
             if(!$thumb&&preg_match('/<img[^>]+src="([^"]+)"/',$html,$m))$thumb=html_entity_decode($m[1],ENT_QUOTES,'UTF-8');
             if($thumb)$blocks[]=['type'=>'image','src'=>$thumb,'alt'=>''];
             $blocks[]=['type'=>'paragraph','text'=>html_entity_decode(strip_tags($html),ENT_QUOTES,'UTF-8')];
@@ -55,7 +55,7 @@ final class Legacy {
         }return $out;
     }
     public function referencesImage(string $id):bool {
-        foreach($this->records() as $r)if(str_contains($r['original_html'],$id)&&preg_match('~(?:src=["\'])(?:/api/images/|/api/public/images/)'.preg_quote($id,'~').'["\']~',$this->html($r['original_html'])))return true;return false;
+        foreach($this->records() as $r){if(in_array($r['thumbnail']??null,['/api/images/'.$id,'/api/public/images/'.$id],true))return true;if(str_contains($r['original_html'],$id)&&preg_match('~(?:src=["\'])(?:/api/images/|/api/public/images/)'.preg_quote($id,'~').'["\']~',$this->html($r['original_html'])))return true;}return false;
     }
     public function media(string $path,string $uploads,bool $admin=false):void{
         $path=rawurldecode($path);$prefix='/wp-content/uploads/';$allowed=false;
