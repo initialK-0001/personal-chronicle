@@ -13,3 +13,7 @@ echo "公開本文SSR・エスケープ・日本時間・カテゴリー・サ�
 $p['title']='';$p['blocks']=[['type'=>'paragraph','text'=>"先頭\n\n次行"],['type'=>'heading','text'=>'見出し']];
 check(str_contains(Web::card($p),'<p>先頭 次行 見出し</p>'),'一覧の改行と段落を空白にする');
 check(str_contains(Web::blocks($p['blocks']),"先頭\n\n次行"),'個別本文の改行は保持');
+$periodPosts=[['id'=>'january','title'=>'年境界の投稿','date'=>'2025-12-31T15:00:00Z','tags'=>[],'blocks'=>[['type'=>'paragraph','text'=>'年明け']]],['id'=>'december','title'=>'前年の投稿','date'=>'2025-12-31T14:59:59Z','tags'=>[],'blocks'=>[['type'=>'paragraph','text'=>'年末']]]];
+$periodHtml=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),$periodPosts,'https://example.test',null,'',['year'=>'2026','month'=>'01']);
+if(!str_contains($periodHtml,'年境界の投稿')||str_contains($periodHtml,'前年の投稿'))throw new RuntimeException('日本時間の年月SSR');
+echo "年月絞り込みのSSRと日本時間境界を確認\n";

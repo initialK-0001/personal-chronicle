@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {japanMonth,matchesPeriod,periodYears} from '../ui/date-filter.js';
+test('年・月の境界は日本時間',()=>{assert.equal(japanMonth('2025-12-31T15:00:00Z'),'2026-01');assert.equal(japanMonth('2025-12-31T14:59:59Z'),'2025-12');assert.equal(japanMonth('2004-12-18T13:12:52Z'),'2004-12');});
+test('年のみ・月のみ・年と月・解除・日時欠損',()=>{const d='2010-02-01T00:00:00+09:00';assert(matchesPeriod(d,'2010'));assert(matchesPeriod(d,'','02'));assert(matchesPeriod(d,'2010','02'));assert(!matchesPeriod(d,'2011','02'));assert(!matchesPeriod(d,'2010','03'));assert(matchesPeriod(null));assert(!matchesPeriod(null,'2010'));assert(!matchesPeriod('invalid','','02'));assert.deepEqual(periodYears(['2025-12-31T15:00Z',d,d,null,'invalid']),['2026','2010']);});
+test('表示済み件数でなく全記録を絞り込む・更新日時は使わない',()=>{const posts=Array.from({length:200},(_,i)=>({date:i===199?'2004-12-18T13:12:52Z':'2026-03-01T00:00Z',updatedAt:'2026-11-16T00:00Z'}));assert.equal(posts.filter(p=>matchesPeriod(p.date,'2004','12')).length,1);assert.equal(posts.filter(p=>matchesPeriod(p.date,'2026','11')).length,0);});

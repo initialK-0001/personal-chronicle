@@ -30,7 +30,7 @@ try {
     }
     if(preg_match('~^/api/public/images/([a-f0-9]{64})$~D',$path,$m)&&$method==='GET')(new Chronicle\Media($store,$config['images']??''))->serve($m[1],true,$legacy->referencesImage($m[1]));
     if($method==='GET'&&str_starts_with($path,'/wp-content/uploads/'))$legacy->media($path,$config['legacy_uploads']??'');
-    $publicAssets=['/style.css'=>'text/css','/timeline.js'=>'text/javascript','/public.js'=>'text/javascript','/login.js'=>'text/javascript','/comments.js'=>'text/javascript','/contact.js'=>'text/javascript'];
+    $publicAssets=['/date-filter.js'=>'text/javascript','/style.css'=>'text/css','/timeline.js'=>'text/javascript','/public.js'=>'text/javascript','/login.js'=>'text/javascript','/comments.js'=>'text/javascript','/contact.js'=>'text/javascript'];
     if($method==='GET'&&isset($publicAssets[$path])){header('Content-Type: '.$publicAssets[$path]);readfile(__DIR__.'/../ui'.$path);exit;}
     if($method==='GET'&&$path==='/robots.txt'){header('Content-Type: text/plain; charset=UTF-8');echo ($config['public_indexing']??false)===true?"User-agent: *\nDisallow: /admin\nDisallow: /api/\nDisallow: /login\nSitemap: ".$config['origin']."/sitemap.xml\n":"User-agent: *\nDisallow: /\n";exit;}
     if($method==='GET'&&$path==='/sitemap.xml'){if(($config['public_indexing']??false)!==true)throw new Chronicle\Failure('見つかりません',404);header('Content-Type: application/xml; charset=UTF-8');echo Chronicle\Web::sitemap($config['origin'],$store->publicPosts(),$legacy,$works->published(array_merge($store->publicPosts(),$legacy->posts())));exit;}
@@ -39,7 +39,7 @@ try {
         if(isset($_GET['wpdmdl']))$legacy->download((int)$_GET['wpdmdl'],$config['legacy_uploads']??'');
         $posts=$store->publicPosts();$selected=null;
         if(isset($_GET['post'])){if(!is_string($_GET['post']))throw new Chronicle\Failure('記事がありません',404);foreach($posts as $p)if($p['id']===$_GET['post'])$selected=$p;if(!$selected)throw new Chronicle\Failure('記事がありません',404);}
-        $html=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($posts,$legacy->posts()),$config['origin'],$selected);
+        $html=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($posts,$legacy->posts()),$config['origin'],$selected,'',$_GET);
         if($selected)$html=str_replace('</article>',$works->navigation($selected['id'],$posts).'</article>',$html);
         serveHTML($html,true);
     }
@@ -48,7 +48,7 @@ try {
         serveHTML(str_replace('</head>','<link rel="canonical" href="'.Chronicle\Web::escape($config['origin'].'/contact-form').'"></head>',file_get_contents(__DIR__.'/../ui/contact.html')),true);
     }
     if($method==='GET'&&($r=$legacy->find($path))){$html=$legacy->page($r);$html=str_replace('</head>','<link rel="canonical" href="'.Chronicle\Web::escape(Chronicle\Web::url($config['origin'],$r['path'])).'"></head>',$html);serveHTML($html,true);}
-    if($method==='GET'&&($category=$legacy->category($path))){$html=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($store->publicPosts(),$legacy->posts()),$config['origin'],null,$category['name']);$html=str_replace('</head>','<link rel="canonical" href="'.Chronicle\Web::escape(Chronicle\Web::url($config['origin'],$category['path'])).'"></head>',$html);serveHTML($html,true);}
+    if($method==='GET'&&($category=$legacy->category($path))){$html=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($store->publicPosts(),$legacy->posts()),$config['origin'],null,$category['name'],$_GET);$html=str_replace('</head>','<link rel="canonical" href="'.Chronicle\Web::escape(Chronicle\Web::url($config['origin'],$category['path'])).'"></head>',$html);serveHTML($html,true);}
     if(!str_starts_with($path,'/api/')&&!str_starts_with($path,'/admin')&&!in_array($path,['/comments-admin.js','/legacy-admin.js','/contact-admin.js','/works-admin.js'],true))throw new Chronicle\Failure('見つかりません',404);
     $auth=new Chronicle\Auth($store,$config);$auth->start();
     if($path==='/api/session'&&$method==='GET')respond(['authenticated'=>$auth->loggedIn(),'csrf'=>$_SESSION['csrf']]);

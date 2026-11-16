@@ -24,7 +24,7 @@ final class Web {
     }
     private static function shortBlocks(array $blocks):array{$seen=false;return array_values(array_filter($blocks,function($b)use(&$seen){if($b['type']!=='image')return true;if($seen)return false;$seen=true;return true;}));}
     public static function date(?string $date):string {if(!$date)return '';return (new \DateTimeImmutable($date))->setTimezone(new \DateTimeZone('Asia/Tokyo'))->format('Y/m/d');}
-    public static function page(string $template,array $posts,string $origin,?array $post=null,string $theme=''):string {
+    public static function page(string $template,array $posts,string $origin,?array $post=null,string $theme='',array $period=[]):string {
         $title=$post?($post['title']?:'投稿'):($theme?:'Brand-new TOKYO');$html=preg_replace('~<title>.*?</title>~s','<title>'.self::escape($title).($title==='Brand-new TOKYO'?'':' | Brand-new TOKYO').'</title>',$template);
         $html=str_replace(['href="style.css"','src="public.js"'],['href="/style.css"','src="/public.js"'],$html);
         if($theme!=='')$html=str_replace('<h1 id="pageTitle">タイムライン</h1>','<h1 id="pageTitle">'.self::escape($theme).'</h1>',$html);
@@ -34,6 +34,7 @@ final class Web {
             $html=str_replace('<article id="articlePage" hidden></article>','<article id="articlePage">'.$content.'</article>',$html);
             $html=str_replace(['class="resulthead"','id="feed"'],['class="resulthead" hidden','id="feed" hidden'],$html);
         }else{
+            if(preg_match('/^\d{4}$/D',is_string($period['year']??null)?$period['year']:'')||preg_match('/^(0[1-9]|1[0-2])$/D',is_string($period['month']??null)?$period['month']:'')){$year=preg_match('/^\d{4}$/D',is_string($period['year']??null)?$period['year']:'')?$period['year']:'';$month=preg_match('/^(0[1-9]|1[0-2])$/D',is_string($period['month']??null)?$period['month']:'')?$period['month']:'';$posts=array_values(array_filter($posts,function($p)use($year,$month){if(empty($p['date']))return false;try{$d=(new \DateTimeImmutable($p['date']))->setTimezone(new \DateTimeZone('Asia/Tokyo'));return (!$year||$d->format('Y')===$year)&&(!$month||$d->format('m')===$month);}catch(\Throwable){return false;}}));}
             if($theme!=='')$posts=array_values(array_filter($posts,fn($p)=>in_array($theme,$p['tags'],true)));
             usort($posts,fn($a,$b)=>strcmp($b['date']??'',$a['date']??''));
             $html=str_replace('<section id="feed" class="feed" aria-label="タイムライン"></section>','<section id="feed" class="feed timeline" aria-label="タイムライン">'.implode('',array_map([self::class,'card'],array_slice($posts,0,50))).'</section>',$html);
