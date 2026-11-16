@@ -53,6 +53,8 @@ header .brand,.mainnav button{background:transparent}.mainnav button[aria-presse
 @media(max-width:360px){.timeline-post.has-thumbnail{grid-template-columns:90px minmax(0,1fr);gap:10px}}
 .comment-management{max-width:1120px;margin:24px auto;padding:24px;background:white}.comment-management label{display:block;margin:12px 0}.comment-management textarea,.comment-management input{display:block;width:100%;max-width:700px}.comment-management article{border-top:1px solid #ddd;padding:20px 0}.comment-text{white-space:pre-wrap}.comment-management button{margin:4px}
 
+.policy-links{max-width:900px;margin:20px auto;padding:0 20px}.chronicle-ad{max-width:900px;margin:32px auto;padding:16px 20px;min-height:280px;box-sizing:border-box}.chronicle-ad>span{display:block;font-size:12px;color:#666;margin-bottom:8px}
+
 .comments{margin-top:40px}.comments label,.comment label{display:block;margin:12px 0}.comments input,.comments textarea,.comment textarea{display:block;width:100%;box-sizing:border-box}.comment{border-top:1px solid #ddd;padding:20px 0}.comment p{white-space:pre-wrap;overflow-wrap:anywhere}.comment button{margin:8px}
 
 .legacy-article{max-width:900px;margin:32px auto;padding:0 20px}.legacy-article img{max-width:100%;height:auto}.legacy-article pre{overflow:auto}.legacy-article table{max-width:100%;display:block;overflow:auto}.login{max-width:420px;margin:60px auto;padding:20px}.login label,.login input{display:block;width:100%;margin:12px 0}

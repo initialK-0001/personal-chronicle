@@ -18,6 +18,7 @@ for name in ['style.css','timeline.js','index.html','public.js','admin.html','ad
   s=s.replace('<a href="report.html">調査と設計</a><a href="source.zip" download>ソースを保存</a>','')
   s=s.replace('<script type="module" src="comments-admin.js"></script>','').replace('image/webp,image/gif','image/webp')
   s=re.sub(r'<div class="adposition">.*?</div>','',s)
+ if name=='style.css':s+='\n.policy-links{max-width:900px;margin:20px auto;padding:0 20px}.chronicle-ad{max-width:900px;margin:32px auto;padding:16px 20px;min-height:280px;box-sizing:border-box}.chronicle-ad>span{display:block;font-size:12px;color:#666;margin-bottom:8px}\n'
  if name=='style.css':s+='\n.comments{margin-top:40px}.comments label,.comment label{display:block;margin:12px 0}.comments input,.comments textarea,.comment textarea{display:block;width:100%;box-sizing:border-box}.comment{border-top:1px solid #ddd;padding:20px 0}.comment p{white-space:pre-wrap;overflow-wrap:anywhere}.comment button{margin:8px}\n'
  if name=='style.css':s+='\n.legacy-article{max-width:900px;margin:32px auto;padding:0 20px}.legacy-article img{max-width:100%;height:auto}.legacy-article pre{overflow:auto}.legacy-article table{max-width:100%;display:block;overflow:auto}.login{max-width:420px;margin:60px auto;padding:20px}.login label,.login input{display:block;width:100%;margin:12px 0}\n'
  if name=='admin.js':

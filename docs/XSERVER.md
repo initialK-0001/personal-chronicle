@@ -58,7 +58,7 @@ HTTP試験は一時ディレクトリ・乱数のテスト認証情報・ロー�
 ## 本番切替前に残る作業
 
 1. 実ブラウザーでの投稿から再編集までの通し確認 実機写真のアップロードと実ホストのメモリー確認。
-2. 旧記事全件の表示差分確認 AdSense実配信と広告設定の復元 旧記事の編集 お問い合わせフォーム対応。
+2. 旧記事全件の表示差分確認 AdSense実配信と広告設定の復元 旧記事編集画面の実操作 お問い合わせフォーム対応。
 3. 広告、固定ページの互換、検索・SEO、一覧のページ分割、切替直前の旧コメント差分確認。新規コメント受付は実装済み。
 4. 実ホストPHP/DB/セッション・HTTPSでの検証、管理者認証設定、追加認証と復旧経路の確認。自作のアプリ認証層は本番前に再レビューする。
 5. 独立した全ファイルバックアップと復元試験、具体的な切替・戻し手順、利用者による切替承認。
@@ -87,7 +87,7 @@ PHP標準機能を使った小規模な実装として検証を始めた段階�
 
 - 公開192件の変換を監査し 画像868/868 埋め込み35/35 Amazon短縮コード198/198 配布リンク36/36を確認。`php xserver/bin/audit-legacy.php /private/posts-import-v2.json` で再現。画像ファイルの取得や全ページの目視を保証する件数ではない。
 - 地図はHTTPSのGoogle Maps embed 動画はYouTube embedだけを許可し 他ホストのiframeと任意scriptは除去。元のYouTube埋込2件はプロトコル省略・壊れた属性を表示時に正規化。Yahoo地図APIのscript2件は未移植で移行前に代替表示の確認が必要。
-- DB原本の対象テーブル wp319d61options を限定して広告設定を確認。AmazonJSの識別子とCocoon側の識別子は別だったため 一律置換しない。amazonjs変換用の legacy_amazon_tag にはAmazonJS側の確認値を配備時に設定する。広告ID/API秘密値をソースへ書き込まない。AdSense配信は未実装。
+- DB原本の対象テーブル wp319d61options を限定して広告設定を確認。AmazonJSの識別子とCocoon側の識別子は別だったため 一律置換しない。amazonjs変換用の legacy_amazon_tag にはAmazonJS側の確認値を配備時に設定する。広告ID/API秘密値をソースへ書き込まない。AdSense配信コードは後掲の2026-11-16節で追加 実配信は未有効化。
 - ブラウザーで確認したのは匿名公開画面の短文全文・長文概要・記事ページ遷移。管理画面のブラウザー操作は未確認で 認証・投稿・再編集・公開・非公開・端末間共有は実HTTPテストで検証した。
 - UI用 /api/state による下書き再保存 別セッションからの復元 古い版の409拒否 公開 非公開を確認。投稿ボタンの連打で新規下書きが重複する処理を抑制。セッション保管期限を認証期限8時間に合わせた。ブラウザー終了後のログイン保持は実装していない。
 - 本体を公開領域外へ配置後 `php xserver/bin/front-controller.php /private/config.json /absolute/public_html > /private/index.generated.php` で本番用入口を生成できる。生成物だけをpublic_html/index.phpに配置する（本番への配置は承認後）。Rewrite設定はpublic/.htaccessを使う。既存WordPressファイルと設定は退避・復旧手順を確定するまで変更しない。
@@ -155,3 +155,32 @@ php xserver/bin/restore.php /private/backups/new-snapshot
 - 既存画像の管理プレビューは認証付き `/admin/legacy-media/` 経由。新しく追加した画像は通常の非公開アップロードを使用し 旧記事の確定版に参照されて初めて匿名配信する。非公開化後は他の公開投稿で参照されていない画像を404に戻す。
 - バックアップ形式を2へ更新して旧記事の下書き・公開版・履歴を含める。旧形式1は新テーブルを空として復元可能。配備時に `php xserver/bin/setup.php` を再実行し CREATE TABLE IF NOT EXISTSで2テーブルを追加する。既存テーブルの削除・置換はしない。
 - PHP単体と実HTTPで同一URL更新 下書きの非公開 別セッション復元 競合拒否 原文不変 HTML無害化 非公開化時404 新画像公開制御 サイトマップ除外を確認。復元試験で編集2テーブルの全列一致と形式1互換を確認。実ブラウザーでの編集操作 実MySQL 全旧記事の表示比較は未確認。
+
+## 2026-11-16 AdSenseの引継ぎ
+
+保存済み原本DBの対象optionsだけを検査。Cocoonは手動配置 `by_myself` で 共通レスポンシブ広告枠と関連コンテンツ枠 端末別widget枠を確認。一覧上/下 サイドバー上/下 本文上/中 SNS下 関連記事下の配置フラグが有効だった。フラグは実際の配信・アカウントの自動広告有効を保証しない。Complianzの保存設定から認定CMPの稼働は確認できなかった。
+
+`python3 scripts/audit-wordpress-ads.py /private/backup.sql.gz --prefix wp319d61 --output /private/adsense-migration.json` で識別子と配置フラグのみ抽出。任意のoptionsや秘密キーは出力しない。共通枠はformat=autoに限定し関連コンテンツ枠と区別。既存出力は上書きしない。元DBを実行しない。実識別子は配備先の非公開設定へ移し ソースに固定しない。
+
+設定例（下記IDはテスト用で実配信不可）：
+```json
+"adsense": {
+  "enabled": false,
+  "account_settings_verified": false,
+  "client": "ca-pub-0000000000000000",
+  "slot": "0000000000"
+}
+```
+
+`Ads.php`は公開HTML・public_indexing=true・local_testでないHTTPS環境・上記2フラグtrue・正しいID形式がそろった場合だけ広告を挿入する。管理画面 ログイン 開発プレビュー APIには挿入しない。作品や本文の中へ割り込まず ページ末尾に共通レスポンシブ枠を1つ配置し スポンサーリンク表示と最小高さを確保。旧配置数をそのまま再現したものではなく 収益の維持は未検証。自動広告はアカウント側の設定に従うため オーバーレイ等の設定は切替前に実確認する。
+
+Google公式の対応方式に合わせ 広告を出す公開ページだけランダムnonceとstrict-dynamicを使用し 自サイトのスクリプトにもnonceを付与。広告なしの管理・開発ページは従来の制限を維持。Google広告が必要とするunsafe-eval等を含むため 本番で許可範囲と配信結果を確認する。広告の実読込・クリック・収益計測は検証環境では行わない。
+
+公開済みの旧 `/privacy-policy` が存在する場合 公開画面の下部へリンクする。本文は原文を引き継ぐが 古いWordPress・Analytics等の記載を現運用に合わせる確認は未完了。EEA・英国・スイス向けのパーソナライズ広告に必要な認定CMP等の設定は AdSenseアカウントで確認する。`account_settings_verified` は確認記録を残した後に設定する運用フラグであり このフラグ自体が同意取得を実装するものではない。
+
+公式確認先（2026-11-16）：
+- CSP https://support.google.com/adsense/answer/16283098?hl=ja
+- 同意管理 https://support.google.com/adsense/answer/13554116?hl=ja
+- Google CMP https://support.google.com/adsense/answer/16918505?hl=ja
+
+本番の配信コード有効化 PHP変更 WordPress停止はまだ行っていない。ads.txtは以前の取得で404だったため 発行者アカウント側で必要レコードを確認後に対応する。

@@ -6,6 +6,7 @@ with tempfile.TemporaryDirectory() as tmp:
  p=pathlib.Path(tmp);(p/'sessions').mkdir();(p/'images').mkdir();sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close();origin=f'http://127.0.0.1:{port}'
  password='test-'+os.urandom(16).hex();h=subprocess.check_output([php,'-r','echo password_hash(stream_get_contents(STDIN),PASSWORD_DEFAULT);'],input=password.encode()).decode()
  cfg={'dsn':'sqlite:'+str(p/'db.sqlite'),'origin':origin,'password_hash':h,'rate_secret':os.urandom(32).hex(),'sessions':str(p/'sessions'),'images':str(p/'images')}
+ cfg['adsense']={'enabled':True,'account_settings_verified':True,'client':'ca-pub-0000000000000000','slot':'0000000000'}
  (p/'config.json').write_text(json.dumps(dict(cfg,local_test=True)))
  env=dict(os.environ,CHRONICLE_CONFIG=str(p/'config.json'));subprocess.run([php,str(root/'bin/setup.php')],env=env,check=True)
  server=subprocess.Popen([php,'-S',f'127.0.0.1:{port}','-t',str(root/'public'),str(root/'public/index.php')],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -81,6 +82,8 @@ with tempfile.TemporaryDirectory() as tmp:
   assert call(anon,'/api/public/posts')[1]['posts']==[]
   assert a.open(origin+'/admin').status==200
   assert '投稿' in a.open(origin+'/admin').read().decode()
+  assert 'adsbygoogle' not in a.open(origin+'/admin').read().decode()
+  assert 'adsbygoogle' not in anon.open(origin+'/').read().decode()
   assert anon.open(origin+'/admin').geturl()==origin+'/login'
   assert 'noindex' in anon.open(origin+'/login').read().decode()
   # Imported articles: same URL, authenticated editing, public snapshots and image authorization.
