@@ -1,1 +1,1 @@
-{"require":{"php":">=8.3","ext-pdo":"*","ext-gd":"*","ext-dom":"*","ezyang/htmlpurifier":"^4.19"},"config":{"allow-plugins":false},"autoload":{"classmap":["src/"]}}
+{"require":{"php":">=8.3","ext-pdo":"*","ext-gd":"*","ext-dom":"*","ext-exif":"*","ext-mbstring":"*","ezyang/htmlpurifier":"^4.19"},"config":{"allow-plugins":false},"autoload":{"classmap":["src/"]}}
