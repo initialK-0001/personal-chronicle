@@ -3,7 +3,7 @@ declare(strict_types=1);
 ini_set('display_errors','0');
 require __DIR__.'/../src/bootstrap.php';
 header('Content-Type: application/json; charset=UTF-8');header('Cache-Control: no-store');header('X-Content-Type-Options: nosniff');header('X-Frame-Options: DENY');header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
-function serveHTML(string $html,bool $public=false):void{global $config,$legacy;$index=$public&&($config['public_indexing']??false)===true;header('X-Robots-Tag: '.($index?'index, follow':'noindex, nofollow'));if($index)$html=str_replace('<meta name="robots" content="noindex,nofollow">','',$html);header('Content-Type: text/html; charset=UTF-8');header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; frame-src https://www.youtube.com https://www.google.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");if($public&&$legacy->find('/privacy-policy'))$html=str_replace('</body>','<nav class="policy-links" aria-label="サイト情報"><a href="/privacy-policy">プライバシーポリシー</a></nav></body>',$html);if(Chronicle\Ads::enabled($config,$public)&&rtrim(parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH),'/')!=='/contact-form'){$nonce=base64_encode(random_bytes(18));$html=Chronicle\Ads::render($html,$config,$nonce);header("Content-Security-Policy: ".Chronicle\Ads::policy($nonce));}echo $html;exit;}
+function serveHTML(string $html,bool $public=false):void{global $config,$legacy;$html=str_replace('</head>','<link rel="icon" type="image/png" sizes="32x32" href="/site-icon-32.png?v=20261117"><link rel="icon" type="image/png" sizes="192x192" href="/site-icon-192.png?v=20261117"><link rel="apple-touch-icon" sizes="180x180" href="/site-icon-180.png?v=20261117"></head>',$html);$index=$public&&($config['public_indexing']??false)===true;header('X-Robots-Tag: '.($index?'index, follow':'noindex, nofollow'));if($index)$html=str_replace('<meta name="robots" content="noindex,nofollow">','',$html);header('Content-Type: text/html; charset=UTF-8');header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; frame-src https://www.youtube.com https://www.google.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");if($public&&$legacy->find('/privacy-policy'))$html=str_replace('</body>','<nav class="policy-links" aria-label="サイト情報"><a href="/privacy-policy">プライバシーポリシー</a></nav></body>',$html);if(Chronicle\Ads::enabled($config,$public)&&rtrim(parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH),'/')!=='/contact-form'){$nonce=base64_encode(random_bytes(18));$html=Chronicle\Ads::render($html,$config,$nonce);header("Content-Security-Policy: ".Chronicle\Ads::policy($nonce));}echo $html;exit;}
 function respond($data,int $status=200):void{http_response_code($status);echo Chronicle\Store::json($data);exit;}
 try {
     [$store,$config]=chronicle_boot();
@@ -12,6 +12,16 @@ try {
     header('X-Robots-Tag: noindex, nofollow');
     $comments=new Chronicle\Comments($store,$legacy,$config['rate_secret']);
     $path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);$method=$_SERVER['REQUEST_METHOD'];
+    // Explicitly restore the former WordPress site icon without exposing other unreferenced media.
+    $siteIcons=['/favicon.ico'=>32,'/site-icon-32.png'=>32,'/site-icon-192.png'=>192,'/site-icon-180.png'=>180];
+    if(isset($siteIcons[$path])){
+        if(!in_array($method,['GET','HEAD'],true)){header('Allow: GET, HEAD');throw new Chronicle\Failure('未対応の操作です',405);}
+        $size=$siteIcons[$path];$file=rtrim($config['legacy_uploads']??'','/').'/2017/08/cropped-街のアイコン2-'.$size.'x'.$size.'.png';
+        $info=is_file($file)?@getimagesize($file):false;
+        if(!$info||$info[2]!==IMAGETYPE_PNG||$info[0]!==$size||$info[1]!==$size)throw new Chronicle\Failure('画像がありません',404);
+        header('Content-Type: image/png');header('Cache-Control: public, max-age=86400');header('Content-Length: '.filesize($file));
+        if($method==='GET')readfile($file);exit;
+    }
     if($path==='/ads.txt'){
         if(!in_array($method,['GET','HEAD'],true)){header('Allow: GET, HEAD');throw new Chronicle\Failure('未対応の操作です',405);}
         $sellers=Chronicle\Ads::sellers($config);if($sellers===null)throw new Chronicle\Failure('見つかりません',404);
