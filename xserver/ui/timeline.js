@@ -9,11 +9,11 @@ export function listExcerpt(post){return characters(post.blocks.filter(b=>b.type
 export function timelineHTML(post,url,admin=false){
  const info=summary(post),image=post.blocks.find(b=>b.type==='image');
  const article=!!post.title?.trim()||info.length>400;
- const linked=article||info.truncated;
+ const linked=article||info.truncated||info.images>0;
  const heading=post.title?`<h2>${linked?`<a href="${esc(url)}">${esc(post.title)}</a>`:esc(post.title)}</h2>`:'';
  const date=post.date?esc(new Date(post.date).toLocaleDateString('ja-JP',{timeZone:'Asia/Tokyo'})):'';
  const excerpt=listExcerpt(post);
- const body=(excerpt?`<p>${esc(excerpt)}${info.length>400?'…':''}</p>`:'')+(!article&&image?blockHTML(image):'');
+ const body=(excerpt?`<p>${esc(excerpt)}${info.length>400?'…':''}</p>`:'')+(!article&&image?`<a class="post-image-link" href="${esc(url)}" aria-label="投稿全体を見る">${blockHTML(image)}</a>`:'');
  const thumbnail=article&&image?`<a class="article-thumbnail" href="${esc(url)}" aria-label="${esc(post.title||'投稿全体を見る')}"><img src="${esc(image.src)}" alt="${esc(image.alt||'投稿画像')}" loading="lazy"></a>`:'';
  return `<article data-post-id="${esc(post.id)}" class="timeline-post ${article?'article-row':'short-post'} ${thumbnail?'has-thumbnail':''}" ${linked?`data-destination="${esc(url)}"`:''}>${thumbnail}<div class="entry-body">${post.sample?'<p class="hint">表示確認用の記事</p>':''}${heading}<div class="timeline-content">${body}</div><div class="postmeta">${info.truncated?`<a class="readmore" href="${esc(url)}">${info.images>1?'投稿全体を見る':'続きを読む'}</a>`:''}<span class="post-tags">${post.tags.map(esc).join(' / ')}</span><time>${date}</time>${!admin?`<a href="${esc(url)}#comments">コメント</a>`:String()}</div></div>${admin&&!post.sample?`<div class="post-management">${post.visibility==='trash'?`<span>削除済み</span><button data-restore="${esc(post.id)}">戻す</button>`:`<span>${post.visibility==='public'?'公開中':'非公開'}</span><button data-edit="${esc(post.id)}">編集</button>${post.visibility==='public'?`<button data-unpublish="${esc(post.id)}">非公開にする</button>`:''}<button data-trash="${esc(post.id)}">削除</button>`}</div>`:''}</article>`;
 }
