@@ -17,7 +17,7 @@ final class Web {
     public static function card(array $p):string {
         $url=$p['url']??'/?post='.rawurlencode($p['id']);$text='';$rawText='';$image=null;$images=0;
         foreach($p['blocks'] as $b){if($b['type']==='image'){$image??=$b;$images++;}else {$part=$b['text']??($b['type']==='link'?($b['url']??''):'');$rawText.=$part;$text.=$part.' ';}}
-        $text=trim(preg_replace('/\s+/u',' ',$text));preg_match_all('/\X/u',$text,$chars);preg_match_all('/\X/u',$rawText,$rawChars);$long=count($rawChars[0])>140;$article=trim($p['title'])!==''||$long;$excerpt=implode('',array_slice($chars[0],0,140));
+        $text=trim(preg_replace('/\s+/u',' ',$text));preg_match_all('/\X/u',$text,$chars);preg_match_all('/\X/u',$rawText,$rawChars);$long=count($rawChars[0])>400;$article=trim($p['title'])!==''||$long;$excerpt=implode('',array_slice($chars[0],0,400));
         $body=($excerpt!==''?'<p>'.self::escape($excerpt).($long?'…':'').'</p>':'').(!$article&&$image?self::blocks([$image]):'');
         $thumb=$article&&$image?'<a class="article-thumbnail" href="'.self::escape($url).'"><img src="'.self::escape($image['src']).'" alt="'.self::escape($image['alt']??'').'" loading="lazy"></a>':'';
         return '<article class="timeline-post '.($article?'article-row':'short-post').($thumb?' has-thumbnail':'').'">'.$thumb.'<div class="entry-body">'.($p['title']!==''?'<h2><a href="'.self::escape($url).'">'.self::escape($p['title']).'</a></h2>':'').'<div class="timeline-content">'.$body.'</div><div class="postmeta">'.($long||$images>1?'<a class="readmore" href="'.self::escape($url).'">続きを読む</a>':'').'<time>'.self::date($p['date']).'</time><a href="'.self::escape($url).'#comments">コメント</a></div></div></article>';

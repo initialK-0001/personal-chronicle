@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const code=fs.readFileSync(new URL('../ui/timeline-position.js',import.meta.url),'utf8').replaceAll('export function','function');
+test('詳細を開いた位置と追加表示範囲を保持し 両方の戻る操作で復元',()=>{
+ const storage=new Map(),events={},winEvents={};let back=0,scroll=0;
+ const row={dataset:{postId:'legacy-123',destination:'/archive/test'},getBoundingClientRect:()=>({top:175})};
+ const ctx={URL,location:{origin:'https://example.test',pathname:'/',search:'?year=2004&month=12',href:'https://example.test/?year=2004&month=12',assign:u=>{ctx.assigned=u;}},history:{state:null,length:3,replaceState(s){this.state=s;},back(){back++;}},sessionStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},document:{referrer:'',querySelector:()=>({}),querySelectorAll:s=>s.includes('data-post-id')?Array(150).fill(row):[],addEventListener:(n,f)=>events[n]=f},window:{getSelection:()=>null,addEventListener:(n,f)=>winEvents[n]=f,scrollBy:(x,y)=>scroll+=y},ResizeObserver:class{observe(){}disconnect(){}},requestAnimationFrame:f=>f(),setTimeout:()=>{}};
+ vm.createContext(ctx);vm.runInContext(code,ctx);
+ events.click({target:{closest:s=>s.startsWith('#feed')?row:null}});
+ assert.equal(ctx.history.state.timelinePosition.limit,150);assert.equal(ctx.history.state.timelinePosition.offset,175);
+ ctx.location.pathname='/archive/test';ctx.location.search='';ctx.document.referrer='https://example.test/?year=2004&month=12';
+ let prevented=false;events.click({target:{closest:s=>s==='a'?{textContent:'一覧へ戻る'}:null},preventDefault:()=>prevented=true});
+ assert.ok(prevented);assert.equal(back,1);
+ ctx.location.pathname='/';ctx.location.search='?year=2004&month=12';
+ assert.equal(vm.runInContext('returnPosition().id',ctx),'legacy-123');
+ row.getBoundingClientRect=()=>({top:975});vm.runInContext('restoreTimelinePosition()',ctx);assert.ok(scroll>0);
+ ctx.location.search='?year=2026';assert.equal(vm.runInContext('returnPosition()',ctx),null);
+});

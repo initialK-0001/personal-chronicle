@@ -47,8 +47,8 @@ final class Legacy {
     }
     public function posts():array{
         $out=[];foreach($this->records() as $r){if($r['type']!=='post')continue;
-            if(isset($r['archive_preview'])){$preview=$r['archive_preview'];$blocks=[];if($preview['thumbnail'])$blocks[]=['type'=>'image','src'=>$preview['thumbnail'],'alt'=>''];$blocks[]=['type'=>'paragraph','text'=>$preview['text']];$out[]=['id'=>'legacy-'.$r['legacy_id'],'url'=>$r['path'],'title'=>$r['title'],'tags'=>array_column($r['terms'],'name'),'date'=>$r['published_at'],'updatedAt'=>$r['updated_at'],'blocks'=>$blocks];continue;}
-            $html=str_replace('/api/images/','/api/public/images/',$this->html($r['original_html']));$blocks=[];
+            if(isset($r['archive_preview'])){$preview=$r['archive_preview'];if(($r['archive_source']??'')==='X')$preview['text']=preg_replace('/\s*Xの元投稿を開く\s*$/u','',$preview['text']);$blocks=[];if($preview['thumbnail'])$blocks[]=['type'=>'image','src'=>$preview['thumbnail'],'alt'=>''];$blocks[]=['type'=>'paragraph','text'=>$preview['text']];$out[]=['id'=>'legacy-'.$r['legacy_id'],'url'=>$r['path'],'title'=>$r['title'],'tags'=>array_column($r['terms'],'name'),'date'=>$r['published_at'],'updatedAt'=>$r['updated_at'],'blocks'=>$blocks];continue;}
+            $html=str_replace('/api/images/','/api/public/images/',$this->html($r['original_html']));if(($r['archive_source']??'')==='X')$html=preg_replace('~<p>\s*<a[^>]*>Xの元投稿を開く</a>\s*</p>~u','',$html);$blocks=[];
             $thumb=isset($r['thumbnail'])?str_replace('/api/images/','/api/public/images/',self::localUrl($r['thumbnail'])):null;
             if(!$thumb&&preg_match('/<img[^>]+src="([^"]+)"/',$html,$m))$thumb=html_entity_decode($m[1],ENT_QUOTES,'UTF-8');
             if($thumb)$blocks[]=['type'=>'image','src'=>$thumb,'alt'=>''];
