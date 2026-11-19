@@ -13,6 +13,8 @@ final class Store {
     public function initialize(): void {
         require_once __DIR__.'/Works.php';
         (new Works($this))->initialize();
+        require_once __DIR__.'/Dialogues.php';
+        Dialogues::initialize($this->db);
         $mysql=$this->db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql';
         $id=$mysql?'BIGINT PRIMARY KEY AUTO_INCREMENT':'INTEGER PRIMARY KEY AUTOINCREMENT';
         $text=$mysql?'MEDIUMTEXT':'TEXT';

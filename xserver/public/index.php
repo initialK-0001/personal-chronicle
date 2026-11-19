@@ -12,6 +12,39 @@ try {
     header('X-Robots-Tag: noindex, nofollow');
     $comments=new Chronicle\Comments($store,$legacy,$config['rate_secret']);
     $path=parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH);$method=$_SERVER['REQUEST_METHOD'];
+    $dialogues=new Chronicle\Dialogues($store->db,$config['rate_secret'],$config['dialogue_deletion_ledger']??null);
+    $dialoguesEnabled=($config['dialogues_enabled']??false)===true;
+    $cards=fn()=>$dialoguesEnabled?$dialogues->cards():[];
+    $page=static function():int {
+        $value=$_GET['page']??'0';
+        if (!is_string($value)||!preg_match('/^[0-9]{1,6}$/D',$value)) throw new Chronicle\Failure('ページ番号を確認してください');
+        return (int)$value;
+    };
+    if ($path==='/api/dialogue-ingest/batches' && $method==='POST' && $dialoguesEnabled) {
+        $token=$config['dialogue_ingest_sha256']??'';
+        $authorization=$_SERVER['HTTP_AUTHORIZATION']??$_SERVER['REDIRECT_HTTP_AUTHORIZATION']??'';
+        if (!is_string($token)||!preg_match('/^[a-f0-9]{64}$/D',$token)||
+            !preg_match('/^Bearer ([A-Za-z0-9_-]{32,128})$/D',$authorization,$m)||!hash_equals($token,hash('sha256',$m[1])))
+            throw new Chronicle\Failure('受信専用の認証が必要です',401);
+        $raw=file_get_contents('php://input',false,null,0,1000001);
+        if (strlen($raw)>1000000) throw new Chronicle\Failure('一回の受信上限を超えています',413);
+        $data=json_decode($raw,true,512,JSON_THROW_ON_ERROR);
+        if (!is_array($data)) throw new Chronicle\Failure('受信形式を確認してください');
+        $dialogues->receive($data);
+        respond(['received'=>true]);
+    }
+    if ($dialoguesEnabled && $method==='GET' && preg_match('~^/dialogues/([a-f0-9]{64})$~D',$path,$m)) {
+        $part=$page();
+        $record=$dialogues->detail($m[1],true,$part);
+        $title=Chronicle\Web::escape($record['title']);
+        $html='<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><title>'.$title.' | Brand-new TOKYO</title></head><body><main class="paper"><a href="/">一覧へ戻る</a><h1>'.$title.'</h1>';
+        foreach ($record['messages'] as $msg) {
+            $html.='<article><h2>'.Chronicle\Web::escape($msg['speaker']).'</h2><time>'.Chronicle\Web::date($msg['date']).'</time><p style="white-space:pre-wrap;overflow-wrap:anywhere">'.Chronicle\Web::escape($msg['text']).'</p></article>';
+        }
+        if ($part) $html.='<a href="?page='.($part-1).'">前の発言へ</a> ';
+        if ($record['more']) $html.='<a href="?page='.($part+1).'">次の発言へ</a>';
+        serveHTML($html.'</main></body></html>',true);
+    }
     // Explicitly restore the former WordPress site icon without exposing other unreferenced media.
     $siteIcons=['/favicon.ico'=>32,'/site-icon-32.png'=>32,'/site-icon-192.png'=>192,'/site-icon-180.png'=>180];
     if(isset($siteIcons[$path])){
@@ -36,20 +69,20 @@ try {
     if($path==='/api/public/comments'&&$method==='GET')respond(['comments'=>$comments->published(is_string($_GET['post']??null)?$_GET['post']:'')]);
     if($path==='/api/public/posts'){
         if($method!=='GET')throw new Chronicle\Failure('未対応の操作です',405);
-        respond(['posts'=>array_merge($store->publicPosts(),$legacy->posts())]);
+        respond(['posts'=>array_merge($store->publicPosts(),$legacy->posts(),$cards())]);
     }
     if(preg_match('~^/api/public/images/([a-f0-9]{64})$~D',$path,$m)&&$method==='GET')(new Chronicle\Media($store,$config['images']??''))->serve($m[1],true,$legacy->referencesImage($m[1]));
     if($method==='GET'&&str_starts_with($path,'/wp-content/uploads/'))$legacy->media($path,$config['legacy_uploads']??'');
     $publicAssets=['/timeline-position.js'=>'text/javascript','/date-filter.js'=>'text/javascript','/style.css'=>'text/css','/timeline.js'=>'text/javascript','/public.js'=>'text/javascript','/login.js'=>'text/javascript','/comments.js'=>'text/javascript','/contact.js'=>'text/javascript'];
     if($method==='GET'&&isset($publicAssets[$path])){header('Content-Type: '.$publicAssets[$path]);readfile(__DIR__.'/../ui'.$path);exit;}
     if($method==='GET'&&$path==='/robots.txt'){header('Content-Type: text/plain; charset=UTF-8');echo ($config['public_indexing']??false)===true?"User-agent: *\nDisallow: /admin\nDisallow: /api/\nDisallow: /login\nSitemap: ".$config['origin']."/sitemap.xml\n":"User-agent: *\nDisallow: /\n";exit;}
-    if($method==='GET'&&$path==='/sitemap.xml'){if(($config['public_indexing']??false)!==true)throw new Chronicle\Failure('見つかりません',404);header('Content-Type: application/xml; charset=UTF-8');echo Chronicle\Web::sitemap($config['origin'],$store->publicPosts(),$legacy,$works->published(array_merge($store->publicPosts(),$legacy->posts())));exit;}
+    if($method==='GET'&&$path==='/sitemap.xml'){if(($config['public_indexing']??false)!==true)throw new Chronicle\Failure('見つかりません',404);header('Content-Type: application/xml; charset=UTF-8');echo Chronicle\Web::sitemap($config['origin'],array_merge($store->publicPosts(),$cards()),$legacy,$works->published(array_merge($store->publicPosts(),$legacy->posts())));exit;}
     if($method==='GET'&&$path==='/login')serveHTML(file_get_contents(__DIR__.'/../ui/login.html'));
     if($method==='GET'&&$path==='/'){
         if(isset($_GET['wpdmdl']))$legacy->download((int)$_GET['wpdmdl'],$config['legacy_uploads']??'');
         $posts=$store->publicPosts();$selected=null;
         if(isset($_GET['post'])){if(!is_string($_GET['post']))throw new Chronicle\Failure('記事がありません',404);foreach($posts as $p)if($p['id']===$_GET['post'])$selected=$p;if(!$selected)throw new Chronicle\Failure('記事がありません',404);}
-        $html=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($posts,$legacy->posts()),$config['origin'],$selected,'',$_GET);
+        $html=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),array_merge($posts,$legacy->posts(),$cards()),$config['origin'],$selected,'',$_GET);
         if($selected)$html=str_replace('</article>',$works->navigation($selected['id'],$posts).'</article>',$html);
         serveHTML($html,true);
     }
@@ -74,8 +107,25 @@ try {
     $contact=new Chronicle\Contact($store,$config['rate_secret'],$legacy->find('/contact-form')!==null);
     if($path==='/api/public/contact'&&$method==='POST'){$contact->submit($input,$_SERVER['REMOTE_ADDR']??'unknown');respond(['received'=>true],202);}
     if($path==='/api/public/comments'&&$method==='POST'){$comments->submit($input,$_SERVER['REMOTE_ADDR']??'unknown');respond(['received'=>true],202);}
-    if(in_array($path,['/admin','/admin.html','/admin/comments','/admin/legacy-edit','/admin/contact','/admin/works'],true)&&!$auth->loggedIn()){header('Location: /login',true,303);exit;}
+    if(in_array($path,['/admin','/admin.html','/admin/dialogues','/admin/comments','/admin/legacy-edit','/admin/contact','/admin/works'],true)&&!$auth->loggedIn()){header('Location: /login',true,303);exit;}
     $auth->guard();
+    if ($dialoguesEnabled && $method==='GET' && $path==='/admin/dialogues') serveHTML(file_get_contents(__DIR__.'/../ui/dialogues.html'));
+    if ($dialoguesEnabled && $method==='GET' && in_array($path,['/admin/dialogues.js','/admin/dialogue-import.js','/admin/dialogue-export.js'],true)) {header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/'.basename($path));exit;}
+    if ($dialoguesEnabled && $method==='POST' && $path==='/api/admin/dialogues/import') {$dialogues->receive($input);respond(['received'=>true]);}
+    if ($dialoguesEnabled && $method==='GET' && $path==='/api/admin/dialogues') {
+        $filters=[];
+        foreach (['month','q','state'] as $key) {
+            $value=$_GET[$key]??'';
+            if (!is_string($value)) throw new Chronicle\Failure('絞り込み条件を確認してください');
+            $filters[]=$value;
+        }
+        $rows=$dialogues->listing($page(),...$filters);
+        respond(['sections'=>array_slice($rows,0,50),'more'=>count($rows)>50]);
+    }
+    if ($dialoguesEnabled && preg_match('~^/api/admin/dialogues/([a-f0-9]{64})$~D',$path,$m)) {
+        if ($method==='GET') respond($dialogues->detail($m[1],false,$page()));
+        if ($method==='POST') {$dialogues->change($m[1],$input);respond(['saved'=>true]);}
+    }
     if($path==='/admin/works'&&$method==='GET'){header('Location: /admin?view=works',true,303);exit;}
     if($path==='/admin/contact'&&$method==='GET')serveHTML(file_get_contents(__DIR__.'/../ui/contact-admin.html'));
     if($path==='/contact-admin.js'&&$method==='GET'){header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/contact-admin.js');exit;}
@@ -107,7 +157,7 @@ try {
         if(!is_int($input['revision']??null)||!is_string($input['action']??null))throw new Chronicle\Failure('操作を確認してください');
         $comments->change((int)$m[1],$input['revision'],$input['action'],$input['reply']??null);respond(['saved'=>true]);
     }
-    if($method==='GET'&&in_array($path,['/admin','/admin.html','/admin.js'],true)){if($path==='/admin.js'){header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/admin.js');exit;}serveHTML(file_get_contents(__DIR__.'/../ui/admin.html'));}
+    if($method==='GET'&&in_array($path,['/admin','/admin.html','/admin.js'],true)){if($path==='/admin.js'){header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/admin.js');exit;}$html=file_get_contents(__DIR__.'/../ui/admin.html');if($dialoguesEnabled)$html=str_replace('<!-- dialogues -->','<a href="/admin/dialogues">対話記録</a>',$html);serveHTML($html);}
     if($method==='GET'&&preg_match('~^/api/images/([a-f0-9]{64})$~D',$path,$m))(new Chronicle\Media($store,$config['images']??''))->serve($m[1],false);
     if($path==='/api/state'){
         if($method==='GET')respond($store->state());

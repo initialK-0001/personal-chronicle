@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>対話記録 | Brand-new TOKYO</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="paper"><a href="/admin">投稿管理へ</a><h1>対話記録</h1><p id="status" role="status"></p>
+<details id="historyImport" hidden><summary>グリさんの書き出し履歴を照合</summary>
+<p>書き出しを展開し、会話のJSONを選んでください。「端末内で照合」は、双方の発言が同じ会話に含まれるかをこの端末で調べます。</p>
+<label>会話JSON（複数可） <input id="exports" type="file" accept=".json" multiple></label>
+<label>自分の発言の一部 <input id="userMarker" autocomplete="off"></label>
+<label>相手の発言の一部 <input id="replyMarker" autocomplete="off"></label>
+<label>相手の表示名 <input id="speaker" placeholder="グリ"></label>
+<button id="inspect">端末内で照合</button><button id="importMatched" disabled>一致した会話を非公開で取り込む</button>
+<p role="status" id="importStatus"></p></details><form id="filters" hidden><label>年月 <input type="month" name="month"></label> <label>検索 <input type="search" name="q"></label> <label>状態 <select name="state"><option value="">すべて</option><option value="private">非公開</option><option value="public">公開中</option></select></label> <button>絞り込む</button></form><section id="list"></section><section id="record" hidden><a href="/admin/dialogues">対話記録の一覧へ</a><h2 id="title"></h2><p id="visibility"></p><div id="messages"></div>
+<label>公開タイトル <input id="publicTitle" maxlength="125"></label>
+<label id="dateLabel" hidden>元日時不明時の掲載日 <input id="date" type="date"></label>
+<button id="release">選んだ発言を公開</button> <button id="unpublish">全体を非公開に戻す</button> <button id="erase">この区間を削除</button></section>
+<nav aria-label="ページ切り替え" id="pages"></nav></main><script type="module" src="/admin/dialogues.js"></script></body></html>

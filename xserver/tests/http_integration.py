@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Exercise the real PHP HTTP/session stack with disposable data only."""
-import http.cookiejar,json,os,pathlib,socket,subprocess,tempfile,time,urllib.request,urllib.error
+import hashlib,http.cookiejar,json,os,pathlib,socket,subprocess,tempfile,time,urllib.request,urllib.error
 root=pathlib.Path(__file__).resolve().parents[1];php=os.environ.get('PHP_BIN','php')
 with tempfile.TemporaryDirectory() as tmp:
  p=pathlib.Path(tmp);(p/'sessions').mkdir();(p/'images').mkdir();sock=socket.socket();sock.bind(('127.0.0.1',0));port=sock.getsockname()[1];sock.close();origin=f'http://127.0.0.1:{port}'
  password='test-'+os.urandom(16).hex();h=subprocess.check_output([php,'-r','echo password_hash(stream_get_contents(STDIN),PASSWORD_DEFAULT);'],input=password.encode()).decode()
  cfg={'dsn':'sqlite:'+str(p/'db.sqlite'),'origin':origin,'password_hash':h,'rate_secret':os.urandom(32).hex(),'sessions':str(p/'sessions'),'images':str(p/'images')}
+ ingest_token=os.urandom(32).hex();ledger=p/'tombstones';ledger.touch(mode=0o600);cfg.update(dialogues_enabled=True,dialogue_deletion_ledger=str(ledger),dialogue_ingest_sha256=hashlib.sha256(ingest_token.encode()).hexdigest())
  cfg['adsense']={'enabled':True,'account_settings_verified':True,'client':'ca-pub-0000000000000000','slot':'0000000000'}
  (p/'config.json').write_text(json.dumps(dict(cfg,local_test=True)))
  env=dict(os.environ,CHRONICLE_CONFIG=str(p/'config.json'));subprocess.run([php,str(root/'bin/setup.php')],env=env,check=True)
@@ -219,6 +220,38 @@ with tempfile.TemporaryDirectory() as tmp:
   assert call(anon,'/api/public/comments',submitted,ct)[0]==429
   assert a.open(origin+'/admin/comments').status==200
   assert anon.open(origin+'/admin/comments').geturl()==origin+'/login'
+  # Synthetic dot record through the machine and admin HTTP entry points.
+  route='/api/dialogue-ingest/batches'
+  headers={'Authorization':'Bearer '+ingest_token}
+  msg={'id':'q','seq':0,'role':'user','speaker':'私','date':'2026-11-19T00:00:00Z','version':1,'text':'個人的な質問','format':'text'}
+  reply=dict(msg,id='a',seq=1,role='assistant',speaker='試験相手',text='公開を選んだ返事')
+  batch={'source':'test','thread':'one','section':'first','title':'非公開の元タイトル','messages':[msg,reply]}
+  assert call(anon,route,batch)[0]==401
+  assert call(anon,route,batch,headers=headers)[0]==200
+  lst='/api/admin/dialogues'
+  assert call(anon,lst)[0]==401
+  row=call(a,lst)[1]['sections'][0];detail=lst+'/'+row['id'];public='/dialogues/'+row['id']
+  assert call(anon,public)[0]==404
+  assert a.open(origin+'/admin/dialogues').status==200 and a.open(origin+'/admin/dialogue-export.js').status==200
+  assert call(a,lst+'?month=2026-11&state=private')[1]['sections'][0]['id']==row['id']
+  assert not call(a,lst+'?month=2026-10')[1]['sections'] and not call(a,lst+'?q=unmatched-term')[1]['sections']
+  before=call(a,detail)[1]
+  assert call(a,lst+'/import',batch,token)[0]==200 and call(a,detail)[1]==before
+  assert call(anon,route,dict(batch,visibility='public'),headers=headers)[0]==400
+  act={'action':'release','revision':before['revision'],'messages':[before['messages'][1]['id']],'title':'公開用タイトル'}
+  assert call(a,detail,act,token)[0]==200
+  changed=dict(reply,text='対話だけの非公開編集',version=2)
+  assert call(anon,route,dict(batch,messages=[changed]),headers=headers)[0]==200
+  assert call(a,detail,act,token)[0]==409
+  for surface,output in enumerate([anon.open(origin+public).read().decode(),anon.open(origin+'/').read().decode(),json.dumps(call(anon,'/api/public/posts')[1],ensure_ascii=False)]):
+   assert '公開を選んだ返事' in output and all(t not in output for t in ['個人的な質問','対話だけの非公開編集','非公開の元タイトル']), (surface,output[:2000])
+  revision=call(a,detail)[1]['revision']
+  assert call(a,detail,{'action':'unpublish','revision':revision},token)[0]==200 and call(anon,public)[0]==404
+  assert call(a,detail,{'action':'delete','revision':revision+1},token)[0]==200
+  assert len(ledger.read_text().splitlines())==2
+  assert call(anon,route,batch,headers=headers)[0]==200 and not call(a,lst)[1]['sections']
+  assert call(anon,route,dict(batch,messages=[dict(reply,id='new',seq=2)]),headers=headers)[0]==200
+  assert len(call(a,detail)[1]['messages'])==1 and call(anon,public)[0]==404
   assert call(a,'/api/logout',{},token)[0]==200
   assert call(a,f'/api/admin/posts/{id}')[0]==401
   t=call(anon,'/api/session')[1]['csrf']
