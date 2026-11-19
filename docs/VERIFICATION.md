@@ -377,3 +377,5 @@ PHP構文、web.php、archive-import.php、Node timelineと位置復元の合計
 PHP 8.4.27の隔離テスト環境で、PHP起動時からsession.upload_progress.enabled=0を指定。無効であることを確認し、xserver/tests/http_integration.pyの実HTTP試験（認証、セッション、公開分離、画像投稿等）が成功。これは互換性試験。本番に修正が適用された証拠は未取得。
 
 [PHP公式の事前案内とセッション関連情報](https://www.php.net/archive/2026.php) ／ [ホスティング事業者の10月案件の対応範囲](https://www.xserver.ne.jp/php_vulnerability.php)
+
+2026-11-19 リニューアル前のトップおよび旧記事「乗り換えしやすい駅＠東京」の公開時のヘッダーから文面を照合。PHPで生成したHTMLをDOMとして読み、headのdescriptionが1件で原文に一致し、見出しの下にも同じ本文があり、記事とカテゴリーに共有されないことを確認。実HTTPの既存統合試験成功。前回の本番配備ペイロードで確認したWeb.phpを元に、隔離した配備先で1ファイルのみの置き換え、旧版バックアップ、ハッシュ一致、再実行時の変更なしを検証。本人のChromeを操作する接続がなく本番反映と公開HTMLの変更確認は未実施。Googleの実検索結果への反映は再クロール後に検索側が判断する。

@@ -17,3 +17,15 @@ $periodPosts=[['id'=>'january','title'=>'年境界の投稿','date'=>'2025-12-31
 $periodHtml=Chronicle\Web::page(file_get_contents(__DIR__.'/../ui/index.html'),$periodPosts,'https://example.test',null,'',['year'=>'2026','month'=>'01']);
 if(!str_contains($periodHtml,'年境界の投稿')||str_contains($periodHtml,'前年の投稿'))throw new RuntimeException('日本時間の年月SSR');
 echo "年月絞り込みのSSRと日本時間境界を確認\n";
+
+$description = '新しい物事と東京生活中心に書いているブログですが、最近はVRM(人型3Dモデル規格)の話が多いです。';
+$home = Web::page($tpl, [$p], 'https://example.test');
+$dom = new DOMDocument();
+$dom->loadHTML($home, LIBXML_NOERROR | LIBXML_NOWARNING);
+$xpath = new DOMXPath($dom);
+$meta = $xpath->query('/html/head/meta[@name="description"]');
+check($meta->length === 1 && $meta->item(0)->getAttribute('content') === $description, 'トップの紹介文を初期HTMLの検索用説明に復元');
+check($xpath->evaluate('string(//h1[@id="pageTitle"]/following-sibling::p[1])') === $description, '同じ紹介文を見出しの下に表示');
+foreach ([$html, Web::page($tpl, [$p], 'https://example.test', null, '旧カテゴリー')] as $otherPage) {
+    check(!str_contains($otherPage, $description), '記事とカテゴリーにトップの紹介文を流用しない');
+}
