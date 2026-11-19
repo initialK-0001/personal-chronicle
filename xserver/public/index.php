@@ -158,7 +158,7 @@ try {
         if(!is_int($input['revision']??null)||!is_string($input['action']??null))throw new Chronicle\Failure('操作を確認してください');
         $comments->change((int)$m[1],$input['revision'],$input['action'],$input['reply']??null);respond(['saved'=>true]);
     }
-    if($method==='GET'&&in_array($path,['/admin','/admin.html','/admin.js'],true)){if($path==='/admin.js'){header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/admin.js');exit;}$html=file_get_contents(__DIR__.'/../ui/admin.html');if($dialoguesEnabled)$html=str_replace('<!-- dialogues -->','<a href="/admin/dialogues">対話記録</a>',$html);serveHTML($html);}
+    if($method==='GET'&&in_array($path,['/admin','/admin.html','/admin.js'],true)){if($path==='/admin.js'){header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/admin.js');exit;}$html=file_get_contents(__DIR__.'/../ui/admin.html');if($dialoguesEnabled)$html=str_replace('<!-- dialogues -->','<a href="/admin/dialogues">対話記録を読む</a>',$html);serveHTML($html);}
     if($method==='GET'&&preg_match('~^/api/images/([a-f0-9]{64})$~D',$path,$m))(new Chronicle\Media($store,$config['images']??''))->serve($m[1],false);
     if($path==='/api/state'){
         if($method==='GET')respond($store->state());

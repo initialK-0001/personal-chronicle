@@ -1,9 +1,26 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>対話記録 | Brand-new TOKYO</title><link rel="stylesheet" href="/style.css"></head>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>対話記録 | Brand-new TOKYO</title><link rel="stylesheet" href="/style.css"><style>
+#library,#zipImport,#folderSync{margin-block:1.75rem}
+#list a,#zipRecords a{font-size:1.05rem;font-weight:600;text-decoration:underline;text-underline-offset:.15em}
+#filters{margin-block:1rem}
+#list p{line-height:1.8}
+#record #title{padding:0;margin-bottom:.25em}
+#pagesTop,#pages{line-height:2;margin-block:1rem}
+#messages article{border-top:1px solid var(--line);padding:1rem 0;line-height:1.7}
+#messages article>label{font-weight:600}
+#messages article>small{margin-inline-start:.75rem;color:var(--muted)}
+#messages article>p{white-space:pre-wrap;overflow-wrap:anywhere;margin-bottom:0}
+</style></head>
 <body><main class="paper"><a href="/admin">投稿管理へ</a><h1>対話記録</h1><p id="status" role="status"></p>
+<section id="library" hidden>
+<h2>取り込んだ会話</h2>
+<div id="list"></div>
+<nav aria-label="会話一覧のページ切り替え" id="listPages"></nav>
+<form id="filters" hidden><label>年月 <input type="month" name="month"></label> <label>検索 <input type="search" name="q"></label> <label>状態 <select name="state"><option value="">すべて</option><option value="private">非公開</option><option value="public">公開中</option></select></label> <button>絞り込む</button></form>
+</section>
 <section id="zipImport" hidden><h2>対話記録ZIPを取り込む</h2>
 <form id="zipForm"><label>会話記録用ZIP <input id="zipFile" type="file" accept=".zip,application/zip" required></label>
-<button type="submit">非公開で取り込む</button></form><p id="zipStatus" role="status"></p></section>
+<button type="submit">非公開で取り込む</button></form><p id="zipStatus" role="status"></p><div id="zipRecords"></div></section>
 <section id="folderSync" hidden><h2>会話の自動取り込み</h2>
 <p>公式の書き出しを展開した会話JSONのフォルダーを一度選ぶと、この一覧を開いている間、新しいファイルや変更を確認して原文を非公開で保存します。ChatGPTでの書き出しは別途必要です。</p>
 <button id="connectFolder">フォルダーに接続・再開</button> <button id="stopFolder" disabled>接続を解除</button>
@@ -15,8 +32,9 @@
 <label>相手の発言の一部 <input id="replyMarker" autocomplete="off"></label>
 <label>相手の表示名 <input id="speaker" placeholder="グリ"></label>
 <button id="inspect">端末内で照合</button><button id="importMatched" disabled>一致した会話を非公開で取り込む</button>
-<p role="status" id="importStatus"></p></details><form id="filters" hidden><label>年月 <input type="month" name="month"></label> <label>検索 <input type="search" name="q"></label> <label>状態 <select name="state"><option value="">すべて</option><option value="private">非公開</option><option value="public">公開中</option></select></label> <button>絞り込む</button></form><section id="list"></section><section id="record" hidden><a href="/admin/dialogues">対話記録の一覧へ</a><h2 id="title"></h2><p id="visibility"></p><div id="messages"></div>
+<p role="status" id="importStatus"></p></details><section id="record" hidden><a href="/admin/dialogues">対話記録の一覧へ</a><h2 id="title"></h2><p id="visibility"></p><nav id="pagesTop" aria-label="発言のページ切り替え（上）"></nav><div id="messages"></div>
+<nav id="pages" aria-label="発言のページ切り替え（下）"></nav>
 <label>公開タイトル <input id="publicTitle" maxlength="125"></label>
 <label id="dateLabel" hidden>元日時不明時の掲載日 <input id="date" type="date"></label>
 <button id="release">選んだ発言を公開</button> <button id="unpublish">全体を非公開に戻す</button> <button id="erase">この区間を削除</button></section>
-<nav aria-label="ページ切り替え" id="pages"></nav></main><script type="module" src="/admin/dialogues.js"></script></body></html>
+</main><script type="module" src="/admin/dialogues.js"></script></body></html>

@@ -184,6 +184,7 @@ final class Dialogues {
             }
             // Replayed tombstones must not recreate the erased conversation title.
             $this->query('DELETE FROM chronicle_dialogues WHERE id=? AND revision=0',[$id]);
+            $counts['sectionId']=($counts['added']+$counts['existing']+$counts['updated'])>0 ? $id : null;
             return $counts;
         });
     }
@@ -209,7 +210,8 @@ final class Dialogues {
         elseif ($state!=='') throw new Failure('公開状態を確認してください');
         $clause=$where?' WHERE '.implode(' AND ',$where):'';
         $offset=$page*50;
-        return $this->query("SELECT * FROM chronicle_dialogues d $clause ORDER BY first_date DESC,id LIMIT 51 OFFSET $offset",$args)->fetchAll();
+        return $this->query("SELECT d.*,(SELECT COUNT(*) FROM chronicle_utterances u WHERE u.dialogue_id=d.id) AS message_count
+            FROM chronicle_dialogues d $clause ORDER BY first_date DESC,id LIMIT 51 OFFSET $offset",$args)->fetchAll();
     }
 
     public function detail(string $id,bool $public,int $page): array {
@@ -230,8 +232,10 @@ final class Dialogues {
                 'currentPublic'=>$r['released_version']!==null && (int)$r['released_version']===(int)$r['version_no']];
             $messages[]=$data;
         }
-        return ['title'=>$public?$section['public_title']:$section['title'],'public'=>$section['public_title']!==null,
+        $result=['title'=>$public?$section['public_title']:$section['title'],'public'=>$section['public_title']!==null,
             'publicTitle'=>$section['public_title'],'revision'=>(int)$section['revision'],'messages'=>$messages,'more'=>$more];
+        if (!$public) $result['total']=(int)$this->query('SELECT COUNT(*) FROM chronicle_utterances WHERE dialogue_id=?',[$id])->fetchColumn();
+        return $result;
     }
 
     public function change(string $id,array $input): void {

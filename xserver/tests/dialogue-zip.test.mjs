@@ -19,3 +19,20 @@ test('会話JSONだけを取り込み、他のファイルや破損したZIPを�
     await assert.rejects(importZip(new Blob([data]),()=>{sent=true;}),/ZIP/);
     assert.equal(sent,false);
 });
+
+test('登録済みの会話も取り込み結果から開け、全発言削除済みの会話は開けない',async()=>{
+    const entries=['既存の会話','削除した会話'].map((title,i)=>({
+        id:'thread-'+i,title,current_node:'1',mapping:{'1':{message:{
+            id:'m'+i,author:{role:'user'},content:{content_type:'text',parts:['試験']}
+        }}}
+    }));
+    const file=zip([['conversations.json',JSON.stringify(entries)]]);
+    const links=[];
+    const send=async(_,packet)=>packet.title===entries[0].title
+        ? {existing:1,deleted:0,added:0,updated:0,sectionId:'a'.repeat(64)}
+        : {existing:0,deleted:1,added:0,updated:0,sectionId:null};
+    const totals=await importZip(file,send,undefined,(id,title)=>links.push({id,title}));
+    assert.deepEqual(links,[{id:'a'.repeat(64),title:entries[0].title}]);
+    assert.equal(totals.existing,1);
+    assert.equal(totals.deleted,1);
+});

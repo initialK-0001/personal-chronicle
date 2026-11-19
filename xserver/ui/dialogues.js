@@ -35,7 +35,6 @@ async function start() {
     const query = new URLSearchParams(params);
     query.delete('id');
     const result = await request(path + '?' + query);
-    let more;
     if (id) {
         record = result;
         element('record').hidden = false;
@@ -52,8 +51,6 @@ async function start() {
             const label = node('label','');
             label.append(select, msg.speaker + '　' + (msg.date ? new Date(msg.date).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}) : '日時不明'));
             const body = node('p',msg.text);
-            body.style.whiteSpace = 'pre-wrap';
-            body.style.overflowWrap = 'anywhere';
             row.append(label,node('small', msg.currentPublic ? '公開中' : msg.released ? '変更は非公開' : '非公開'),body);
             const info=msg.captureInfo;
             const items=[...(info?.['本文内リンク']||[]),...(info?.['本文外の添付表示']||[])];
@@ -65,35 +62,44 @@ async function start() {
             }
             element('messages').append(row);
         }
-        more = record.more;
+        for (const name of ['pagesTop','pages']) {
+            renderPages(element(name), record.more, record.messages.length, record.total);
+        }
     } else {
+        element('library').hidden = false;
         element('historyImport').hidden = false;
         element('filters').hidden=false;
         for (const key of ['month','state','q']) element('filters').elements[key].value=params.get(key)||'';
         element('folderSync').hidden=false;
         const refresh=async()=>renderList(await request(path+'?'+query));
-        mountZipImport(request,refresh);
+        mountZipImport(request,refresh,readLink);
         const rememberSpeaker=mountSync(request,refresh);
         mountImport(request,()=>location.reload(),rememberSpeaker);
         renderList(result);
         return;
     }
-    renderPages(more);
+}
+function readLink(title, sectionId) {
+    return link(title + 'の発言を読む', sectionId, 0);
 }
 function renderList(result) {
     element('list').replaceChildren();
     for (const s of result.sections) {
         const p = node('p','');
-        p.append(link(s.title,s.id,0),s.public_title === null ? '　非公開' : '　一部または全部を公開中');
+        p.append(readLink(s.title,s.id),'　'+s.message_count+'件の発言',s.public_title === null ? '　非公開' : '　一部または全部を公開中');
         element('list').append(p);
     }
-    element('status').textContent=result.sections.length?'':'このページに記録はありません。';
-    renderPages(result.more);
+    if (!result.sections.length) element('list').append(node('p','この条件に該当する会話はありません。'));
+    renderPages(element('listPages'), result.more);
 }
-function renderPages(more) {
-    element('pages').replaceChildren();
-    if (page > 0) element('pages').append(link('前のページ',id,page-1),'　');
-    if (more) element('pages').append(link('次のページ',id,page+1));
+function renderPages(nav, more, count, total) {
+    nav.replaceChildren();
+    if (total !== undefined) {
+        const range = count ? (page * 50 + 1) + '〜' + (page * 50 + count) + '件目' : 'このページの発言は0件';
+        nav.append(node('span', '全' + total + '件の発言　' + range), '　');
+    }
+    if (page > 0) nav.append(link('前のページ',id,page-1),'　');
+    if (more) nav.append(link('次のページ',id,page+1));
 }
 async function change(action) {
     const payload = {action, revision:record.revision};

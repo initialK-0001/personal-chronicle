@@ -236,7 +236,8 @@ with tempfile.TemporaryDirectory() as tmp:
   assert call(a,lst+'?month=2026-11&state=private')[1]['sections'][0]['id']==row['id']
   assert not call(a,lst+'?month=2026-10')[1]['sections'] and not call(a,lst+'?q=unmatched-term')[1]['sections']
   before=call(a,detail)[1]
-  assert call(a,lst+'/import',batch,token)[0]==200 and call(a,detail)[1]==before
+  assert before['total']==2 and int(row['message_count'])==2
+  assert call(a,lst+'/import',batch,token)[1]['sectionId']==row['id'] and call(a,detail)[1]==before
   assert call(anon,route,dict(batch,visibility='public'),headers=headers)[0]==400
   act={'action':'release','revision':before['revision'],'messages':[before['messages'][1]['id']],'title':'公開用タイトル'}
   assert call(a,detail,act,token)[0]==200
@@ -249,6 +250,7 @@ with tempfile.TemporaryDirectory() as tmp:
   assert call(a,detail,{'action':'unpublish','revision':revision},token)[0]==200 and call(anon,public)[0]==404
   assert call(a,detail,{'action':'delete','revision':revision+1},token)[0]==200
   assert len(ledger.read_text().splitlines())==2
+  assert call(a,lst+'/import',batch,token)[1]['sectionId'] is None
   assert call(anon,route,batch,headers=headers)[0]==200 and not call(a,lst)[1]['sections']
   assert call(anon,route,dict(batch,messages=[dict(reply,id='new',seq=2)]),headers=headers)[0]==200
   assert len(call(a,detail)[1]['messages'])==1 and call(anon,public)[0]==404
@@ -279,6 +281,7 @@ with tempfile.TemporaryDirectory() as tmp:
   assert response['added']==2 and response['existing']==2
   assert ingest('first',extension,anchor)[1]['existing']==4
   row=call(a,lst+'?q=%E7%AA%93')[1]['sections'][0]
+  assert response['sectionId']==row['id'] and int(row['message_count'])==4
   private=lst+'/'+row['id'];public='/dialogues/'+row['id']
   data=call(a,private)[1];assert len(data['messages'])==4 and data['messages'][0]['text']=='前の発言'
   assert data['messages'][1]['captureInfo']==metadata and call(anon,public)[0]==404
