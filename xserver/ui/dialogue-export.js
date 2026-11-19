@@ -58,6 +58,10 @@ export function batches(c, {kind, speaker, useSourceNames=false}) {
         if (!Number.isSafeInteger(timestamp) || timestamp < 0) throw Error('版日時を特定できません');
         const message = {id:m.id, seq, version:timestamp, date, role:m.author.role,
             speaker:m.author.role === 'user' ? '私' : ((useSourceNames && (m.author.metadata?.display_name || m.author.name)) || speaker), format:'markdown', text:m.content.parts[0], parent:previousId?.id ?? null};
+        if (/^dot-html-[a-f0-9]{64}$/.test(thread)) {
+            const details=c.mapping[m.id]?.['保存画面の情報'];
+            if (details) message.captureInfo=details;
+        }
         const batch = {source:'chatgpt-personal', thread, section, title:c.title || (kind==='dot'?speaker+'との対話':'ChatGPTとの対話'), messages:[message]};
         if (new TextEncoder().encode(JSON.stringify(batch)).length > 1000000 || new TextEncoder().encode(message.text).length>800000)
             throw Error('受信上限を超える発言');

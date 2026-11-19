@@ -1,4 +1,5 @@
 import {mountSync} from './dialogue-sync.js';
+import {mountZipImport} from './dialogue-zip-import.js';
 import {mountImport} from './dialogue-import.js';
 const element = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -54,6 +55,14 @@ async function start() {
             body.style.whiteSpace = 'pre-wrap';
             body.style.overflowWrap = 'anywhere';
             row.append(label,node('small', msg.currentPublic ? '公開中' : msg.released ? '変更は非公開' : '非公開'),body);
+            const info=msg.captureInfo;
+            const items=[...(info?.['本文内リンク']||[]),...(info?.['本文外の添付表示']||[])];
+            if (items.length) {
+                const details=node('details','');
+                details.append(node('summary','保存画面のリンク・添付表示'));
+                for (const item of items) details.append(node('p',[item['種類'],item['表示']||item['表示名'],item['説明'],item.URL,item['実体']].filter(Boolean).join('　')));
+                row.append(details);
+            }
             element('messages').append(row);
         }
         more = record.more;
@@ -62,7 +71,9 @@ async function start() {
         element('filters').hidden=false;
         for (const key of ['month','state','q']) element('filters').elements[key].value=params.get(key)||'';
         element('folderSync').hidden=false;
-        const rememberSpeaker=mountSync(request,async()=>renderList(await request(path+'?'+query)));
+        const refresh=async()=>renderList(await request(path+'?'+query));
+        mountZipImport(request,refresh);
+        const rememberSpeaker=mountSync(request,refresh);
         mountImport(request,()=>location.reload(),rememberSpeaker);
         renderList(result);
         return;

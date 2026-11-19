@@ -258,6 +258,34 @@ with tempfile.TemporaryDirectory() as tmp:
   assert send_label(incoming)==200 and send_label(dict(incoming,speaker='グリ'))==200
   assert send_label(incoming)==200 and call(a,detail)[1]['messages'][-1]['speaker']=='グリ'
   assert send_label(dict(incoming,text='別の本文'))==409
+  # Two snapshots with shifted windows share one section and retain their private link notes.
+  capture='dot-html-'+'a'*64
+  base=dict(batch,source='chatgpt-personal',thread=capture,section='mid',title='窓の重なりを検証')
+  metadata={'本文内リンク':[{'表示':'参照','URL':'https://example.invalid/only-private'}]}
+  mid=dict(msg,id='mid',captureInfo=metadata)
+  end=dict(reply,id='end',parent='mid')
+  def ingest(section,items,anchor=None):
+   item=dict(base,section=section,messages=items)
+   if anchor:item['captureAnchor']=anchor
+   return call(a,lst+'/import',item,token)
+  assert ingest('mid',[mid,end])[1]['added']==2
+  lookup={'thread':capture,'ids':['first','mid']}
+  assert call(a,lst+'/capture-anchor',lookup,token)[1]['anchor']==1
+  assert call(anon,lst+'/capture-anchor',lookup)[0] in (401,403)
+  anchor={'id':'mid','seq':1}
+  first=dict(msg,id='first',text='前の発言')
+  extension=[first,dict(mid,seq=1,parent='first'),dict(end,seq=2),dict(reply,id='newer',seq=3,parent='end')]
+  response=ingest('first',extension,anchor)[1]
+  assert response['added']==2 and response['existing']==2
+  assert ingest('first',extension,anchor)[1]['existing']==4
+  row=call(a,lst+'?q=%E7%AA%93')[1]['sections'][0]
+  private=lst+'/'+row['id'];public='/dialogues/'+row['id']
+  data=call(a,private)[1];assert len(data['messages'])==4 and data['messages'][0]['text']=='前の発言'
+  assert data['messages'][1]['captureInfo']==metadata and call(anon,public)[0]==404
+  assert ingest('end',[dict(end,seq=0,parent=None)],{'id':'end','seq':0})[1]['existing']==1
+  assert ingest('end',[dict(end,seq=0,text='競合')],{'id':'end','seq':0})[0]==409
+  assert call(a,private,{'action':'release','revision':data['revision'],'title':'試験','messages':[data['messages'][1]['id']]},token)[0]==200
+  assert 'only-private' not in anon.open(origin+public).read().decode()
   assert call(a,'/api/logout',{},token)[0]==200
   assert call(a,f'/api/admin/posts/{id}')[0]==401
   t=call(anon,'/api/session')[1]['csrf']

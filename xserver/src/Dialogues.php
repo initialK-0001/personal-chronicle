@@ -57,20 +57,47 @@ final class Dialogues {
         }
     }
 
-    public function receive(array $batch): void {
+    public function captureAnchor(array $input): ?int {
+        $thread=self::field($input,'thread',128);
+        $ids=$input['ids']??null;
+        if (!preg_match('/^dot-html-[a-f0-9]{64}$/D',$thread) || !is_array($ids) || !array_is_list($ids) || !$ids || count($ids)>250)
+            throw new Failure('会話IDの照合条件を確認してください');
+        $keys=[];
+        foreach ($ids as $id) $keys[]=$this->key(['chatgpt-personal',$thread,self::field(['id'=>$id],'id',512)]);
+        $marks=implode(',',array_fill(0,count($keys),'?'));
+        $known=$this->query("SELECT id FROM chronicle_utterances WHERE dialogue_id IS NOT NULL AND id IN ($marks)",$keys)->fetchAll(PDO::FETCH_COLUMN);
+        $matches=array_intersect($keys,$known);
+        return $matches ? array_key_first($matches) : null;
+    }
+
+    public function receive(array $batch): array {
         $thread=self::field($batch,'thread',512);
         $section=self::field($batch,'section',512);
         $title=self::field($batch,'title',500);
         $source=self::field($batch,'source',160);
         $id=$this->key([$source,$thread,$section]);
         $messages=$batch['messages']??null;
-        if (array_diff(array_keys($batch),['thread','section','title','source','messages']) ||
+        $anchor=$batch['captureAnchor']??null;
+        $capture=$source==='chatgpt-personal' && preg_match('/^dot-html-[a-f0-9]{64}$/D',$thread);
+        if ($anchor!==null && (!$capture || !is_array($anchor) || !is_int($anchor['seq']??null) || $anchor['seq']<0))
+            throw new Failure('ZIPの照合条件を確認してください');
+        if (array_diff(array_keys($batch),['thread','section','title','source','messages','captureAnchor']) ||
             !is_array($messages)||!array_is_list($messages)||!$messages||count($messages)>100)
             throw new Failure('受信形式を確認してください');
-        $this->transaction(function() use($source,$thread,$title,$id,$messages) {
+        return $this->transaction(function() use($source,$thread,$title,$id,$messages,$anchor,$capture) {
+            $counts=['added'=>0,'updated'=>0,'existing'=>0,'deleted'=>0];
+            $offset=0;
+            $mysql=$this->db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql';
+            if ($anchor!==null) {
+                $key=$this->key([$source,$thread,self::field($anchor,'id',512)]);
+                $found=$this->query('SELECT dialogue_id,seq FROM chronicle_utterances WHERE id=?'.($mysql?' FOR UPDATE':''),[$key])->fetch();
+                if (!$found || $found['dialogue_id']===null) throw new Failure('照合元が変わりました。もう一度取り込んでください',409);
+                $id=$found['dialogue_id'];
+                $offset=(int)$found['seq']-$anchor['seq'];
+            }
             $changed=false;
             foreach ($messages as $m) {
-                if (!is_array($m)||array_diff(array_keys($m),['id','seq','version','speaker','role','date','text','format','parent']) ||
+                if (!is_array($m)||array_diff(array_keys($m),['id','seq','version','speaker','role','date','text','format','parent','captureInfo']) ||
                     !in_array($m['role']??null,['user','assistant'],true) ||
                     !is_int($m['seq']??null)||$m['seq']<0||!is_int($m['version']??null)||$m['version']<0)
                     throw new Failure('発言の形式を確認してください');
@@ -80,22 +107,54 @@ final class Dialogues {
                     strtotime($date)===false||gmdate('Y-m-d\TH:i:s\Z',strtotime($date))!==$date)) throw new Failure('元日時を確認してください');
                 if (!in_array($m['format']??null,['text','markdown'],true)) throw new Failure('本文書式を確認してください');
                 $parent=isset($m['parent'])?$this->key([$source,$thread,self::field($m,'parent',512)]):null;
-                $body=Store::json(['speaker'=>self::field($m,'speaker',300),'role'=>$m['role'],'date'=>$date,
-                    'text'=>self::field($m,'text',800000),'format'=>$m['format'],'parent'=>$parent]);
+                $data=['speaker'=>self::field($m,'speaker',300),'role'=>$m['role'],'date'=>$date,
+                    'text'=>self::field($m,'text',800000),'format'=>$m['format'],'parent'=>$parent];
+                if (isset($m['captureInfo'])) {
+                    $meta=$m['captureInfo'];
+                    if (!$capture || !is_array($meta) || array_diff(array_keys($meta),['元の日時','本文内リンク','本文外の添付表示']) ||
+                        strlen(Store::json($meta))>120000) throw new Failure('保存画面の補足情報を確認してください');
+                    if (isset($meta['元の日時'])) self::field($meta,'元の日時',64);
+                    foreach (['本文内リンク'=>['表示','URL'],'本文外の添付表示'=>['種類','表示名','説明','URL','実体']] as $group=>$fields) {
+                        if (!isset($meta[$group])) continue;
+                        if (!is_array($meta[$group]) || !array_is_list($meta[$group])) throw new Failure('リンク・添付表示の形式を確認してください');
+                        foreach ($meta[$group] as $item) {
+                            if (!is_array($item) || array_diff(array_keys($item),$fields)) throw new Failure('リンク・添付表示の項目を確認してください');
+                            foreach ($item as $value) if (!is_string($value)) throw new Failure('リンク・添付表示の値を確認してください');
+                        }
+                    }
+                    $data['captureInfo']=$meta;
+                }
+                $body=Store::json($data);
                 // Lock the section before reading its messages, including on replay.
-                $mysql=$this->db->getAttribute(PDO::ATTR_DRIVER_NAME)==='mysql';
+                $seq=$m['seq']+$offset;
                 $upsert=$mysql?'ON DUPLICATE KEY UPDATE id=id':'ON CONFLICT(id) DO NOTHING';
                 $this->query("INSERT INTO chronicle_dialogues(id,title,revision) VALUES(?,?,0) ".$upsert,[$id,$title]);
                 $old=$this->query('SELECT * FROM chronicle_utterances WHERE id=?'.($mysql?' FOR UPDATE':''),[$key])->fetch();
-                if ($old && $old['dialogue_id']===null) continue; // Erased source message.
-                if ($old && ($old['dialogue_id']!==$id || (int)$old['seq']!==$m['seq'])) throw new Failure('取得元の順序または区間が競合しています',409);
+                if ($old && $old['dialogue_id']===null) { $counts['deleted']++; continue; } // Erased source message.
+                if ($old && ($old['dialogue_id']!==$id || (int)$old['seq']!==$seq)) throw new Failure('取得元の順序または区間が競合しています',409);
                 $version=$m['version'];
                 $previous=$this->query('SELECT data_json FROM chronicle_utterance_versions WHERE utterance_id=? AND version_no=?',[$key,$version])->fetchColumn();
                 if ($previous!==false) {
-                    if ($previous === $body) continue;
+                    if ($previous === $body) { $counts['existing']++; continue; }
                     // A generic export label can later be identified by matching the actual speaker.
                     $stored=json_decode($previous,true,512,JSON_THROW_ON_ERROR);
                     $incoming=json_decode($body,true,512,JSON_THROW_ON_ERROR);
+                    if ($capture) {
+                        // The first visible message in a saved window can lack its original parent.
+                        if ($incoming['parent']===null || $stored['parent']===null) $incoming['parent']=$stored['parent'];
+                        if (isset($stored['captureInfo']) && !isset($incoming['captureInfo'])) $incoming['captureInfo']=$stored['captureInfo'];
+                        $body=Store::json($incoming);
+                        if ($stored===$incoming) { $counts['existing']++; continue; }
+                        if (!isset($stored['captureInfo']) && isset($incoming['captureInfo'])) {
+                            $enriched=$stored+['captureInfo'=>$incoming['captureInfo']];
+                            if ($enriched===$incoming) {
+                                $this->query('UPDATE chronicle_utterance_versions SET data_json=? WHERE utterance_id=? AND version_no=?',[$body,$key,$version]);
+                                $changed=true;
+                                $counts['updated']++;
+                                continue;
+                            }
+                        }
+                    }
                     $unknown='応答者（表示名不明）';
                     if ($m['role']==='assistant' && ($stored['speaker']===$unknown || $incoming['speaker']===$unknown)) {
                         $stored['speaker']=$incoming['speaker'];
@@ -103,15 +162,19 @@ final class Dialogues {
                             if ($incoming['speaker']!==$unknown && (string)$old['released_version']!==(string)$version) {
                                 $this->query('UPDATE chronicle_utterance_versions SET data_json=? WHERE utterance_id=? AND version_no=?',[$body,$key,$version]);
                                 $changed=true;
-                            }
+                                $counts['updated']++;
+                            } else $counts['existing']++;
                             continue;
                         }
                     }
                     throw new Failure('同じ版に異なる原文があります',409);
                 }
-                if (!$old) $this->query('INSERT INTO chronicle_utterances(id,dialogue_id,seq,version_no) VALUES(?,?,?,?)',[$key,$id,$m['seq'],$version]);
+                if (!$old && $capture && $this->query('SELECT 1 FROM chronicle_utterances WHERE dialogue_id=? AND seq=?',[$id,$seq])->fetchColumn())
+                    throw new Failure('同じ位置に別の発言があります。保存範囲を確認してください',409);
+                if (!$old) $this->query('INSERT INTO chronicle_utterances(id,dialogue_id,seq,version_no) VALUES(?,?,?,?)',[$key,$id,$seq,$version]);
                 elseif ($version>(int)$old['version_no']) $this->query('UPDATE chronicle_utterances SET version_no=? WHERE id=?',[$version,$key]);
                 $this->query('INSERT INTO chronicle_utterance_versions VALUES(?,?,?)',[$key,$version,$body]);
+                $counts[$old?'updated':'added']++;
                 $changed=true;
             }
             if ($changed) {
@@ -121,6 +184,7 @@ final class Dialogues {
             }
             // Replayed tombstones must not recreate the erased conversation title.
             $this->query('DELETE FROM chronicle_dialogues WHERE id=? AND revision=0',[$id]);
+            return $counts;
         });
     }
 
@@ -161,6 +225,7 @@ final class Dialogues {
         $messages=[];
         foreach ($rows as $r) {
             $data=json_decode($r['data_json'],true,512,JSON_THROW_ON_ERROR);
+            if ($public) unset($data['captureInfo']);
             if (!$public) $data+=['id'=>$r['id'],'released'=>$r['released_version']!==null,
                 'currentPublic'=>$r['released_version']!==null && (int)$r['released_version']===(int)$r['version_no']];
             $messages[]=$data;
