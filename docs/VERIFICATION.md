@@ -379,3 +379,7 @@ PHP 8.4.27の隔離テスト環境で、PHP起動時からsession.upload_progres
 [PHP公式の事前案内とセッション関連情報](https://www.php.net/archive/2026.php) ／ [ホスティング事業者の10月案件の対応範囲](https://www.xserver.ne.jp/php_vulnerability.php)
 
 2026-11-19 リニューアル前のトップおよび旧記事「乗り換えしやすい駅＠東京」の公開時のヘッダーから文面を照合。PHPで生成したHTMLをDOMとして読み、headのdescriptionが1件で原文に一致し、見出しの下にも同じ本文があり、記事とカテゴリーに共有されないことを確認。実HTTPの既存統合試験成功。前回の本番配備ペイロードで確認したWeb.phpを元に、隔離した配備先で1ファイルのみの置き換え、旧版バックアップ、ハッシュ一致、再実行時の変更なしを検証。本人のChromeを操作する接続がなく本番反映と公開HTMLの変更確認は未実施。Googleの実検索結果への反映は再クロール後に検索側が判断する。
+
+## 旧ブログ紹介文の本番確認（2026-11-19）
+
+手元のChromeで公開トップの更新前に meta description が0件で紹介文が本文に表示されないことを確認。16:37:01 JSTの配備レポート site-description-deployment.json で success=true、対象は xserver/src/Web.php の1件、SHA-256 は 4c0f9a2aa646080ceae891b54101e53aaaecde68a9092103224e2f36e663a642、data_created=false を確認。旧版は private/site-description-before-20261119/previous/xserver/src/Web.php に保全。再読み込み後の公開トップではページ名が Brand-new TOKYO、見出しが「タイムライン」で、その下の本文と1件の meta description が旧紹介文の原文に一致。サーバーパネルで配備用Cronの設定状況がOFFになったことを確認。
