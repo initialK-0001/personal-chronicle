@@ -252,6 +252,12 @@ with tempfile.TemporaryDirectory() as tmp:
   assert call(anon,route,batch,headers=headers)[0]==200 and not call(a,lst)[1]['sections']
   assert call(anon,route,dict(batch,messages=[dict(reply,id='new',seq=2)]),headers=headers)[0]==200
   assert len(call(a,detail)[1]['messages'])==1 and call(anon,public)[0]==404
+  assert a.open(origin+'/admin/dialogue-sync.js').status==200 and call(anon,'/admin/dialogue-sync.js')[0]==401
+  incoming=dict(reply,id='label-test',seq=3,speaker='応答者（表示名不明）')
+  send_label=lambda m:call(a,lst+'/import',dict(batch,messages=[m]),token)[0]
+  assert send_label(incoming)==200 and send_label(dict(incoming,speaker='グリ'))==200
+  assert send_label(incoming)==200 and call(a,detail)[1]['messages'][-1]['speaker']=='グリ'
+  assert send_label(dict(incoming,text='別の本文'))==409
   assert call(a,'/api/logout',{},token)[0]==200
   assert call(a,f'/api/admin/posts/{id}')[0]==401
   t=call(anon,'/api/session')[1]['csrf']

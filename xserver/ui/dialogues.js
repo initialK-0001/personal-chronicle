@@ -1,3 +1,4 @@
+import {mountSync} from './dialogue-sync.js';
 import {mountImport} from './dialogue-import.js';
 const element = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -23,7 +24,7 @@ async function request(url, data) {
     const options = data ? {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf}, body:JSON.stringify(data)} : {};
     const response = await fetch(url, options);
     const result = await response.json();
-    if (!response.ok) throw Error(result.error || '読み込みに失敗しました');
+    if (!response.ok) throw Object.assign(Error(result.error || '読み込みに失敗しました'),{status:response.status});
     return result;
 }
 async function start() {
@@ -60,15 +61,26 @@ async function start() {
         element('historyImport').hidden = false;
         element('filters').hidden=false;
         for (const key of ['month','state','q']) element('filters').elements[key].value=params.get(key)||'';
-        mountImport(request,()=>location.reload());
-        for (const s of result.sections) {
-            const p = node('p','');
-            p.append(link(s.title,s.id,0), s.public_title === null ? '　非公開' : '　一部または全部を公開中');
-            element('list').append(p);
-        }
-        if (!result.sections.length) element('status').textContent = 'このページに記録はありません。';
-        more = result.more;
+        element('folderSync').hidden=false;
+        const rememberSpeaker=mountSync(request,async()=>renderList(await request(path+'?'+query)));
+        mountImport(request,()=>location.reload(),rememberSpeaker);
+        renderList(result);
+        return;
     }
+    renderPages(more);
+}
+function renderList(result) {
+    element('list').replaceChildren();
+    for (const s of result.sections) {
+        const p = node('p','');
+        p.append(link(s.title,s.id,0),s.public_title === null ? '　非公開' : '　一部または全部を公開中');
+        element('list').append(p);
+    }
+    element('status').textContent=result.sections.length?'':'このページに記録はありません。';
+    renderPages(result.more);
+}
+function renderPages(more) {
+    element('pages').replaceChildren();
     if (page > 0) element('pages').append(link('前のページ',id,page-1),'　');
     if (more) element('pages').append(link('次のページ',id,page+1));
 }

@@ -42,13 +42,17 @@ final class Dialogues {
     }
 
     private function transaction(callable $op): mixed {
-        $this->db->beginTransaction();
+        $nested=$this->db->inTransaction();
+        if ($nested) $this->db->exec('SAVEPOINT chronicle_dialogue_op');
+        else $this->db->beginTransaction();
         try {
             $result=$op();
-            $this->db->commit();
+            if ($nested) $this->db->exec('RELEASE SAVEPOINT chronicle_dialogue_op');
+            else $this->db->commit();
             return $result;
         } catch (\Throwable $e) {
-            $this->db->rollBack();
+            if ($nested) $this->db->exec('ROLLBACK TO SAVEPOINT chronicle_dialogue_op');
+            else $this->db->rollBack();
             throw $e;
         }
     }
@@ -88,8 +92,22 @@ final class Dialogues {
                 $version=$m['version'];
                 $previous=$this->query('SELECT data_json FROM chronicle_utterance_versions WHERE utterance_id=? AND version_no=?',[$key,$version])->fetchColumn();
                 if ($previous!==false) {
-                    if ($previous!==$body) throw new Failure('同じ版に異なる原文があります',409);
-                    continue;
+                    if ($previous === $body) continue;
+                    // A generic export label can later be identified by matching the actual speaker.
+                    $stored=json_decode($previous,true,512,JSON_THROW_ON_ERROR);
+                    $incoming=json_decode($body,true,512,JSON_THROW_ON_ERROR);
+                    $unknown='応答者（表示名不明）';
+                    if ($m['role']==='assistant' && ($stored['speaker']===$unknown || $incoming['speaker']===$unknown)) {
+                        $stored['speaker']=$incoming['speaker'];
+                        if ($stored===$incoming) {
+                            if ($incoming['speaker']!==$unknown && (string)$old['released_version']!==(string)$version) {
+                                $this->query('UPDATE chronicle_utterance_versions SET data_json=? WHERE utterance_id=? AND version_no=?',[$body,$key,$version]);
+                                $changed=true;
+                            }
+                            continue;
+                        }
+                    }
+                    throw new Failure('同じ版に異なる原文があります',409);
                 }
                 if (!$old) $this->query('INSERT INTO chronicle_utterances(id,dialogue_id,seq,version_no) VALUES(?,?,?,?)',[$key,$id,$m['seq'],$version]);
                 elseif ($version>(int)$old['version_no']) $this->query('UPDATE chronicle_utterances SET version_no=? WHERE id=?',[$version,$key]);

@@ -110,7 +110,7 @@ try {
     if(in_array($path,['/admin','/admin.html','/admin/dialogues','/admin/comments','/admin/legacy-edit','/admin/contact','/admin/works'],true)&&!$auth->loggedIn()){header('Location: /login',true,303);exit;}
     $auth->guard();
     if ($dialoguesEnabled && $method==='GET' && $path==='/admin/dialogues') serveHTML(file_get_contents(__DIR__.'/../ui/dialogues.html'));
-    if ($dialoguesEnabled && $method==='GET' && in_array($path,['/admin/dialogues.js','/admin/dialogue-import.js','/admin/dialogue-export.js'],true)) {header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/'.basename($path));exit;}
+    if ($dialoguesEnabled && $method==='GET' && in_array($path,['/admin/dialogues.js','/admin/dialogue-import.js','/admin/dialogue-export.js','/admin/dialogue-sync.js'],true)) {header('Content-Type: text/javascript');readfile(__DIR__.'/../ui/'.basename($path));exit;}
     if ($dialoguesEnabled && $method==='POST' && $path==='/api/admin/dialogues/import') {$dialogues->receive($input);respond(['received'=>true]);}
     if ($dialoguesEnabled && $method==='GET' && $path==='/api/admin/dialogues') {
         $filters=[];

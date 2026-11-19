@@ -1,6 +1,10 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>対話記録 | Brand-new TOKYO</title><link rel="stylesheet" href="/style.css"></head>
 <body><main class="paper"><a href="/admin">投稿管理へ</a><h1>対話記録</h1><p id="status" role="status"></p>
+<section id="folderSync" hidden><h2>会話の自動取り込み</h2>
+<p>公式の書き出しを展開した会話JSONのフォルダーを一度選ぶと、この一覧を開いている間、新しいファイルや変更を確認して原文を非公開で保存します。ChatGPTでの書き出しは別途必要です。</p>
+<button id="connectFolder">フォルダーに接続・再開</button> <button id="stopFolder" disabled>接続を解除</button>
+<p id="syncStatus" role="status"></p><ul id="syncIssues"></ul></section>
 <details id="historyImport" hidden><summary>グリさんの書き出し履歴を照合</summary>
 <p>書き出しを展開し、会話のJSONを選んでください。「端末内で照合」は、双方の発言が同じ会話に含まれるかをこの端末で調べます。</p>
 <label>会話JSON（複数可） <input id="exports" type="file" accept=".json" multiple></label>

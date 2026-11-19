@@ -1,6 +1,6 @@
 import {inspect,batches} from './dialogue-export.js';
 
-export function mountImport(request,refresh) {
+export function mountImport(request,refresh,rememberSpeaker) {
     const byId = id=>document.getElementById(id);
     let selected;
     function reset() {
@@ -46,6 +46,7 @@ export function mountImport(request,refresh) {
                 await request('/api/admin/dialogues/import',batch);
                 completed++;
             }
+            await rememberSpeaker(selected[0].thread, byId('speaker').value.trim());
             refresh();
         } catch(e) {
             byId('importStatus').textContent='受信確認 '+completed+' / '+selected.length+'。再実行で照合します。'+e.message;

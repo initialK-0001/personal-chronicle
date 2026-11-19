@@ -22,6 +22,8 @@ test('照合、原文、dotからの発言、24時間の再開、非表示発言
     assert.deepEqual(all.map(b=>b.messages[0].speaker),['グリ','私','グリ','私']);
     assert.equal(all[1].messages[0].text,'私の文\n  改行');
     assert.throws(()=>batches({...c,current_node:'a'},opts),/分岐/);
+    mapping.a.message.create_time=90000;
+    assert.equal(batches(c,opts)[2].section,'initial','遅れて返った回答は質問と同じ区間');
     mapping.b.message.metadata.attachments=['file'];
     assert.throws(()=>batches(c,opts),/添付/);
 });

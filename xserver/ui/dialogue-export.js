@@ -38,7 +38,7 @@ export function inspect(conversations, userMarker, replyMarker) {
     }
     return {matches,unsupported};
 }
-export function batches(c, {kind, speaker}) {
+export function batches(c, {kind, speaker, useSourceNames=false}) {
     const thread = c.conversation_id || c.id;
     if (typeof thread !== 'string' || !thread || !speaker.trim()) throw Error('会話IDまたは表示名がありません');
     const result = [];
@@ -52,12 +52,12 @@ export function batches(c, {kind, speaker}) {
             m.metadata?.attachments?.length) throw Error('添付または未対応書式を含む履歴');
         const when = Number.isFinite(m.create_time) ? m.create_time : null;
         if (!section || (previous !== null && when !== null && when-previous>=86400 &&
-            (m.author.role === 'user' || previousId?.role !== 'user'))) section = m.id;
+            (m.author.role === 'user' || previousId?.author.role !== 'user'))) section = m.id;
         const date = when === null ? null : new Date(Math.floor(when)*1000).toISOString().replace('.000Z','Z');
         const timestamp = Math.round((m.update_time ?? m.create_time ?? 0)*1000000);
         if (!Number.isSafeInteger(timestamp) || timestamp < 0) throw Error('版日時を特定できません');
         const message = {id:m.id, seq, version:timestamp, date, role:m.author.role,
-            speaker:m.author.role === 'user' ? '私' : speaker, format:'markdown', text:m.content.parts[0], parent:previousId?.id ?? null};
+            speaker:m.author.role === 'user' ? '私' : ((useSourceNames && (m.author.metadata?.display_name || m.author.name)) || speaker), format:'markdown', text:m.content.parts[0], parent:previousId?.id ?? null};
         const batch = {source:'chatgpt-personal', thread, section, title:c.title || (kind==='dot'?speaker+'との対話':'ChatGPTとの対話'), messages:[message]};
         if (new TextEncoder().encode(JSON.stringify(batch)).length > 1000000 || new TextEncoder().encode(message.text).length>800000)
             throw Error('受信上限を超える発言');
