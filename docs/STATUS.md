@@ -200,3 +200,5 @@ PHP構文、web.php、archive-import.php、Node timelineと位置復元の合計
 画像1枚・400字以内の短文もdata-destinationの対象にし、画像を個別記事への通常リンクで包む。SSR側も同じ画像リンクを出力。短文の表示形式と本文のみ投稿の動作は維持。Nodeの一覧・復帰位置4試験、PHP web.phpと構文検証成功。Chromeのサーバーパネルがログイン画面のため本番反映待ち。配備スクリプト scripts/deploy-short-image-link.php（2ファイル、前版ハッシュ確認とバックアップ付き）。
 
 2026-11-18 01:21:01 JST 本番反映success=true。2ファイルのハッシュ一致、Cron OFF確認。Chromeで通常の画像付き短文（post=10）から個別表示・一覧復帰、および旧SNS画像投稿からarchive個別ページへの遷移を確認。本番未反映・ログイン待ちは解消。配備前にスクリプト内の配置パスをxserver配下へ修正した。投稿データ変更なし。
+
+2026-11-19 対話記録の[詳細設計案](CHATGPT-RECORDS.md)を作成。全スレッド非公開・原文逐次保存が要件。個人用ChatGPT全端末の無操作取得は未実証。設計のみ。
