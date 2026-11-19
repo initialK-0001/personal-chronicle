@@ -106,3 +106,27 @@ header .brand,.mainnav button{background:transparent}.mainnav button[aria-presse
  .timeline-post.has-thumbnail .timeline-content p{max-height:none;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
  .timeline-post.has-thumbnail .postmeta{margin-top:8px}
 }
+
+/* The introduction sits below the site name in the public timeline header. */
+.masthead header:has(> .site-description) {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 650px);
+  grid-template-areas: "brand search" "description description";
+  row-gap: 6px;
+}
+.masthead header:has(> .site-description) > .brand { grid-area: brand; justify-self: start; }
+.masthead header:has(> .site-description) > #searchForm { grid-area: search; }
+.masthead .site-description {
+  grid-area: description;
+  margin: 0;
+  color: #354735;
+  font-size: 13px;
+  line-height: 1.6;
+}
+@media (max-width: 800px) {
+  .masthead header:has(> .site-description) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "brand" "description" "search";
+  }
+  .masthead .site-description { margin-bottom: 5px; }
+}

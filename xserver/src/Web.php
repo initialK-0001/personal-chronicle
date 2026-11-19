@@ -30,8 +30,8 @@ final class Web {
         if ($post === null && $theme === '') {
             $description = self::escape('新しい物事と東京生活中心に書いているブログですが、最近はVRM(人型3Dモデル規格)の話が多いです。');
             $html = str_replace('</head>', '<meta name="description" content="'.$description.'"></head>', $html);
-            $heading = '<h1 id="pageTitle">タイムライン</h1>';
-            $html = str_replace($heading, '<div>'.$heading.'<p class="hint">'.$description.'</p></div>', $html);
+            $searchForm = '<form id="searchForm"';
+            $html = str_replace($searchForm, '<p class="site-description">'.$description.'</p>'.$searchForm, $html);
         }
         if($theme!=='')$html=str_replace('<h1 id="pageTitle">タイムライン</h1>','<h1 id="pageTitle">'.self::escape($theme).'</h1>',$html);
         if($theme!=='')$html=str_replace('<body>','<body data-theme="'.self::escape($theme).'">',$html);

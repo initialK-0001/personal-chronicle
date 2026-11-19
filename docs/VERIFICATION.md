@@ -383,3 +383,7 @@ PHP 8.4.27の隔離テスト環境で、PHP起動時からsession.upload_progres
 ## 旧ブログ紹介文の本番確認（2026-11-19）
 
 手元のChromeで公開トップの更新前に meta description が0件で紹介文が本文に表示されないことを確認。16:37:01 JSTの配備レポート site-description-deployment.json で success=true、対象は xserver/src/Web.php の1件、SHA-256 は 4c0f9a2aa646080ceae891b54101e53aaaecde68a9092103224e2f36e663a642、data_created=false を確認。旧版は private/site-description-before-20261119/previous/xserver/src/Web.php に保全。再読み込み後の公開トップではページ名が Brand-new TOKYO、見出しが「タイムライン」で、その下の本文と1件の meta description が旧紹介文の原文に一致。サーバーパネルで配備用Cronの設定状況がOFFになったことを確認。
+
+## 紹介文のヘッダーへの移動（2026-11-19）
+
+公開トップの生成HTMLについて、紹介文がヘッダー内のサイト名の直後に1回だけあり、検索用の説明文と原文が一致することを確認。既存の記事・カテゴリーの試験、PHP構文検査および実HTTPの統合試験成功。前回の本番Web.phpと本番CSSを用いた隔離配備で、2ファイルのハッシュ、旧版のバックアップ、再実行時に変更されないことを確認。

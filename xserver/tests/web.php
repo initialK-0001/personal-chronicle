@@ -25,7 +25,8 @@ $dom->loadHTML($home, LIBXML_NOERROR | LIBXML_NOWARNING);
 $xpath = new DOMXPath($dom);
 $meta = $xpath->query('/html/head/meta[@name="description"]');
 check($meta->length === 1 && $meta->item(0)->getAttribute('content') === $description, 'トップの紹介文を初期HTMLの検索用説明に復元');
-check($xpath->evaluate('string(//h1[@id="pageTitle"]/following-sibling::p[1])') === $description, '同じ紹介文を見出しの下に表示');
+check($xpath->evaluate('string(//header/button[@id="brand"]/following-sibling::*[1][self::p])') === $description, '紹介文はサイトタイトルのすぐ下に表示');
+check($xpath->query('//p[text()="'.$description.'"]')->length === 1, '紹介文はタイムライン見出し下と重複しない');
 foreach ([$html, Web::page($tpl, [$p], 'https://example.test', null, '旧カテゴリー')] as $otherPage) {
     check(!str_contains($otherPage, $description), '記事とカテゴリーにトップの紹介文を流用しない');
 }
